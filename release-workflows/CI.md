@@ -7,7 +7,7 @@
 1. 使用 Python 3.14 x64 和 `requirements.txt` 中已固定的依赖创建独立环境。
 2. 检查 Python 源码语法，运行发布结构检查器的本地文件测试。
 3. 通过既有工具准备入口下载并校验 FFmpeg、ffprobe 和 yt-dlp。
-4. 调用 `tests/run_update_tests.py`，分进程执行更新、清单、签名、部署、回退、相关 UI 和输出组织回归。任一失败、错误或跳过都会阻止后续构建产物上传。
+4. 调用 `tests/run_update_tests.py`，分进程执行更新、清单、签名、部署、回退、相关 UI 和输出组织回归。任一失败、错误或未预期跳过都会阻止后续构建产物上传。仅本地 Windows 用户不能创建符号链接时，允许精确列出的工作区链接能力测试跳过；索引链接拒绝测试仍必须通过。托管 runner 具备权限时执行该测试。
 5. 复用 `build.ps1`，生成独立的 `dist-mediaflow-ci` 文件夹，保留原有实际 EXE 构建身份检查。
 6. 再次启动刚生成的 EXE 获取实际身份，使用 `scripts/check_release_structure.py` 核对版本、构建、完整工具与许可、工具和 Qt 许可正文 SHA-256，以及公开文件的隐私门禁。
 7. 只上传通过检查的完整文件夹和不包含个人路径的摘要，保留七天。运行时绝对路径报告放在 runner 临时目录，不进入构建产物。
@@ -44,6 +44,6 @@ python -B scripts/check_release_structure.py `
 
 升级 Action 时需重新从官方仓库核对完整提交，审查修改并更新上述记录。不能将 tag 名或未经核对的示例 SHA 当作固定来源证明。
 
-## 尚需实际运行的验证
+## 实际运行的验证
 
-本地结构检查器测试和源码检查不能代替 GitHub 托管 runner 的实际运行。首次推送到已确认的项目仓库后，需要查看该工作流的真实结果，确认工具和 Qt 许可下载、Windows 打包、原生 EXE 身份检查及 artifact 下载均成功。网络或上游下载失败会停止本次构建，不会改用未验证工具。
+本地结构检查器测试和源码检查不能代替 GitHub 托管 runner 的实际运行。实际运行与失败修复记录见 [RELEASE_VALIDATION.md](../docs/RELEASE_VALIDATION.md)。必须查看真实结果，确认工具和 Qt 许可下载、Windows 打包、原生 EXE 身份检查及 artifact 保存均成功。网络或上游下载失败会停止本次构建，不会改用未验证工具。

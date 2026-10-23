@@ -1469,6 +1469,19 @@
       "reviewed_rules": [
         "credential_literal"
       ]
+    },
+    {
+      "path": "tests/test_github_publisher.py",
+      "sha256": "a7d577938fdd1e2f445a29fd42b5dec0381006c6bd3efbdd93407087c982c6f0",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "已复核完整测试：Ed25519 密钥在 setUp 中临时生成且只在内存中签署合成清单；子进程全部由受控 GitHub 夹具代替，不读取正式保险目录、凭据或用户数据。",
+      "reviewed_lines": [
+        104
+      ],
+      "reviewed_rules": [
+        "private_key_generation"
+      ]
     }
   ],
   "baseline_note": "The index snapshot records the original review baseline; each explicitly reviewed current file is bound by its own SHA-256."

@@ -33,7 +33,8 @@ class OutputIntegrationTests(unittest.TestCase):
 
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.root = Path(self.temp.name)
+        # Canonicalize TEMP aliases before comparing with persisted output paths.
+        self.root = Path(self.temp.name).resolve()
         self.queues = []
         self.controllers = []
 

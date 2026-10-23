@@ -24,7 +24,7 @@ GROUPS = {
              'test_online_update', 'test_update_transport', 'test_update_channel',
              'test_hosted_release', 'test_release_workflow', 'test_brand_migration',
              'test_security', 'test_tool_manager', 'test_update_github',
-             'test_public_source_audit', 'test_release_structure'],
+             'test_public_source_audit', 'test_release_structure', 'test_github_publisher'],
     'ui': ['test_update_ui'],
     'output': ['test_output_integration'],
 }

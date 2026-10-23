@@ -14,7 +14,7 @@ import shutil
 import subprocess
 import sys
 import uuid
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 ROOT=Path(__file__).resolve().parents[1]
 if __package__ in ('',None): sys.path.insert(0,str(ROOT))
@@ -83,6 +83,34 @@ def prepare_assets(directory,repository,extras):
     return manifest,tag,assets,records
 
 
+def verified_asset_urls(current,records,repository,tag,*,published=False):
+    entries=current.get('assets')
+    if not isinstance(entries,list):raise PublicationError('Release asset inventory is missing or invalid.')
+    remote={}
+    names=set()
+    for entry in entries:
+        name=entry.get('name') if isinstance(entry,dict) else None
+        if not isinstance(name,str) or not name or name.casefold() in names:
+            raise PublicationError('Release asset inventory contains invalid or duplicate names.')
+        names.add(name.casefold());remote[name]=entry
+    urls={}
+    for item in records:
+        entry=remote.get(item['name'],{})
+        if entry.get('size')!=item['size'] or entry.get('digest')!='sha256:'+item['sha256']:
+            raise PublicationError('Release asset size/server SHA-256 mismatch; existing assets were preserved.')
+        address=entry.get('browser_download_url')
+        if not isinstance(address,str):raise PublicationError('Release asset download URL is missing.')
+        if published:
+            value=urlsplit(address)
+            prefix='/'+repository+'/releases/download/'+tag+'/'
+            if (value.scheme!='https' or value.netloc!='github.com' or value.query or value.fragment
+                    or not value.path.startswith(prefix)
+                    or unquote(value.path[len(prefix):],errors='strict')!=item['name']):
+                raise PublicationError('Published asset URL does not match the approved repository/version asset.')
+        urls[item['name']]=address
+    return urls
+
+
 def publish(args):
     if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,99}/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}',args.repository):
         raise PublicationError('Repository must be an explicit owner/name.')
@@ -93,7 +121,8 @@ def publish(args):
     if not report_path.parent.is_dir():raise PublicationError('Report parent must exist outside publication assets.')
     if report_path.exists():raise PublicationError('Use a new report path; previous evidence is preserved.')
     report={'passed':False,'repository':args.repository,'tag':tag,'assets':records,
-        'public_online_verified':False,'draft_verified':False,'published':False,'stage':'repository_check'}
+        'public_online_verified':False,'draft_verified':False,'published':False,
+        'publication_requested':False,'published_assets_verified':False,'stage':'repository_check'}
     def save():report_path.write_text(json.dumps(report,ensure_ascii=False,indent=2),'utf-8')
     def run(*command,json_result=False,timeout=120):
         p=subprocess.run([gh,*map(str,command)],stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,
@@ -139,12 +168,12 @@ def publish(args):
             report['uploaded_assets']=report.get('uploaded_assets',0)+1;save()
         report['stage']='remote_asset_inventory';save()
         current=release()
-        remote={r['name']:r for r in current['assets']}
+        if (not current or current.get('id')!=report['release_id'] or current.get('tag_name')!=tag
+                or current.get('draft') is not True):
+            raise PublicationError('Expected draft identity/state could not be confirmed; publication stopped.')
+        urls=verified_asset_urls(current,records,args.repository,tag)
         for item in records:
-            r=remote.get(item['name'],{})
-            if r.get('size')!=item['size'] or r.get('digest')!='sha256:'+item['sha256']:
-                raise PublicationError('Uploaded asset size/server SHA-256 mismatch; draft retained.')
-            item['url']=r['browser_download_url']
+            item['url']=urls[item['name']]
         # A draft is authenticated-only on GitHub. Never pretend this is the
         # anonymous public verification performed by the actual client later.
         report['stage']='authenticated_draft_download';save()
@@ -165,12 +194,23 @@ def publish(args):
             raise PublicationError('Draft package does not match the actually verified signed manifest.')
         report['draft_verified']=True;save()
         if args.publish:
-            report['stage']='publish';save()
+            report.update(stage='publish',publication_requested=True);save()
             run('release','edit',tag,'--repo',args.repository,'--draft=false','--latest')
+            report['stage']='public_release_inventory';save()
             current=release()
-            if not current or current['draft'] or current['prerelease']:
+            expected_url='https://github.com/'+args.repository+'/releases/tag/'+tag
+            if (not current or current.get('id')!=report['release_id'] or current.get('tag_name')!=tag
+                    or current.get('draft') is not False or current.get('prerelease') is not False
+                    or not current.get('published_at') or current.get('html_url')!=expected_url):
                 raise PublicationError('Publication state not confirmed; no public acceptance claimed.')
-            report['published']=True
+            report.update(published=True,release_url=current['html_url'])
+            # GitHub replaces draft untagged-* URLs at publication. Discard the
+            # old addresses even if the final inventory check subsequently fails.
+            for item in records:item.pop('url',None)
+            save()
+            urls=verified_asset_urls(current,records,args.repository,tag,published=True)
+            for item in records:item['url']=urls[item['name']]
+            report['published_assets_verified']=True
         report.update(passed=True,stage='published_pending_anonymous_client_acceptance' if args.publish else 'verified_draft')
         return report
     except Exception as e:

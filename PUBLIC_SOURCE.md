@@ -53,6 +53,8 @@ python -B scripts/audit_public_source.py --root . --index --reviews docs/public-
 
 保留原有 MIT `LICENSE`；该许可适用于项目自行编写的代码，不会把第三方组件重新许可成 MIT。已读的 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)、实际依赖锁定、工具来源记录和许可证必须与最终发布包对应。
 
+2.1.0 最终发布使用已取得对应缓存和构建配方的 BtbN FFmpeg，附独立的两份源码 ZIP、Python/yt-dlp 组件源码及 Qt 完整源码。实际文件、版本、大小、SHA-256 和上游缓存覆盖结果见 [THIRD_PARTY_SOURCES.md](docs/THIRD_PARTY_SOURCES.md) 与 [验收摘要](docs/RELEASE_VALIDATION.md)。下列 Gyan 项描述原工作区的初始审计边界；不将其当作本次最终使用的工具。
+
 需要分别核对：
 
 - FFmpeg/ffprobe：原工作区的 Gyan 9.0.2 essentials 实际启用 GPLv3 与静态依赖。其主 FFmpeg 源码对应 [946fcce07b](https://github.com/FFmpeg/FFmpeg/commit/946fcce07b)，但这一个链接不能证明所有静态库、补丁和构建资料都已齐全。完整对应源码尚未核实时，不应仅凭 notices 宣称完整二进制满足供源要求。[Gyan 官方构建资料](https://www.gyan.dev/ffmpeg/builds/)。
