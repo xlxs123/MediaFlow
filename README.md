@@ -5,6 +5,7 @@ MediaFlow 2.1.0 是 Windows 桌面媒体下载与本地媒体管理工具，使�
 - [公开源码](https://github.com/xlxs123/MediaFlow)
 - [独立发布仓库](https://github.com/xlxs123/MediaFlow-Releases)
 - [发布版本](https://github.com/xlxs123/MediaFlow-Releases/releases)
+- [2.1.0 正式发布与实际公网验收](docs/RELEASE_VALIDATION.md)
 
 ## 使用
 
@@ -13,6 +14,8 @@ MediaFlow 2.1.0 是 Windows 桌面媒体下载与本地媒体管理工具，使�
 支持 Direct HTTP、HLS、DASH、Bilibili 音视频合并、浏览器媒体发现、批量链接导入与合集、断点续传、音轨和字幕选择、命名分类、媒体库历史、完整 SHA-256 去重与空间分析。网站可用性取决于其实际媒体结构和合法会话；不支持 DRM 绕过。
 
 应用数据使用 `%APPDATA%/MediaFlow/2.1.0`，更新状态使用 `%LOCALAPPDATA%/MediaFlow/Updates-v2`。更新不自动迁移登录状态、删除旧程序或覆盖现有媒体。首次升级请在“数据迁移”中预览兼容项目。
+
+旧 2.0.1 尚不包含 GitHub Release CDN 适配，首次采用正式渠道先解压并运行 2.1.0；无需修改或覆盖旧客户端。
 
 ## 从源码构建
 

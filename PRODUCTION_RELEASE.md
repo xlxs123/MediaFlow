@@ -1,6 +1,6 @@
 # MediaFlow 2.1.0 正式发布
 
-源码：[xlxs123/MediaFlow](https://github.com/xlxs123/MediaFlow)。独立资产：[xlxs123/MediaFlow-Releases](https://github.com/xlxs123/MediaFlow-Releases)。客户端固定清单：`https://github.com/xlxs123/MediaFlow-Releases/releases/latest/download/manifest.json`。配置地址不等于已经通过公网验收，真实结果另见交付记录。
+源码：[xlxs123/MediaFlow](https://github.com/xlxs123/MediaFlow)。独立资产：[xlxs123/MediaFlow-Releases](https://github.com/xlxs123/MediaFlow-Releases)。客户端固定清单：`https://github.com/xlxs123/MediaFlow-Releases/releases/latest/download/manifest.json`。2.1.0 已完成正式发布与实际 EXE 公网验收，分层证据见 [RELEASE_VALIDATION.md](docs/RELEASE_VALIDATION.md)；配置地址本身不作为验收证明。
 
 ## 签名和可信根
 

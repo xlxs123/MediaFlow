@@ -1,0 +1,567 @@
+{
+  "schema_version": 1,
+  "product": "MediaFlow",
+  "version": "2.1.0",
+  "recorded_at": "2026-10-23T11:24:49.519255+00:00",
+  "passed": true,
+  "runtime_identity": {
+    "app_version": "2.1.0",
+    "build_id": "20261023T075252Z-50a032a34533",
+    "source_sha256": "50a032a34533e7dac91f71a2a672c9a14cbbead155400ba4c882dda87de3d97f",
+    "built_at_utc": "2026-10-23T07:52:52.811419+00:00",
+    "packaged": true,
+    "dash_feature_revision": 2,
+    "dash_modules": {
+      "core.dash_json": true,
+      "core.embedded_media": true
+    },
+    "dash_module_loaded": true,
+    "track_feature_revision": 1,
+    "track_modules": {
+      "core.media_tracks": true,
+      "core.track_pipeline": true
+    },
+    "track_module_loaded": true,
+    "organization_feature_revision": 1,
+    "organization_modules": {
+      "core.output_organization": true,
+      "core.output_relocation": true
+    },
+    "organization_module_loaded": true,
+    "storage_feature_revision": 1,
+    "storage_modules": {
+      "core.media_storage_scan": true,
+      "core.storage_cleanup": true,
+      "core.windows_recycle": true
+    },
+    "storage_module_loaded": true,
+    "migration_feature_revision": 1,
+    "migration_modules": {
+      "core.data_migration": true,
+      "core.migration_tasks": true,
+      "core.migration_browser": true
+    },
+    "migration_module_loaded": true,
+    "update_feature_revision": 4,
+    "release_channel_state": "initialized",
+    "update_channel": {
+      "key_state": "initialized",
+      "source_sha256": "829373ede9a6e21757582be6733abc8a4184fc6cc960af3d7dfeab403e62084f",
+      "key_fingerprints": {
+        "mediaflow-stable-2026-01": "fa54ae69f7a14184681a810dd33bd28cc4cdbe2870ff58db75df48503caf11d1"
+      }
+    },
+    "update_modules": {
+      "core.update_manager": true,
+      "core.update_manifest": true,
+      "core.update_transport": true,
+      "core.update_health": true,
+      "ed25519": true,
+      "trusted_channel": true
+    },
+    "update_module_loaded": true
+  },
+  "exe_sha256": "560b369ca35200ab70ef6cc8bc53b25965ad94b5a29bfc44261dc0a89e6ed93c",
+  "package": {
+    "format": "zip",
+    "sha256": "ab560859e0b7be22b5b2cfa2f50f9b3fc63c5489c2bd8c4246dd1c0e4b407b6c",
+    "size": 371249271,
+    "url": "https://github.com/xlxs123/MediaFlow-Releases/releases/download/v2.1.0/MediaFlow-2.1.0-20261023T075252Z-50a032a34533.zip"
+  },
+  "public_key": {
+    "key_id": "mediaflow-stable-2026-01",
+    "raw_public_key_sha256": "fa54ae69f7a14184681a810dd33bd28cc4cdbe2870ff58db75df48503caf11d1"
+  },
+  "repositories": [
+    {
+      "full_name": "xlxs123/MediaFlow",
+      "private": false,
+      "url": "https://github.com/xlxs123/MediaFlow"
+    },
+    {
+      "full_name": "xlxs123/MediaFlow-Releases",
+      "private": false,
+      "url": "https://github.com/xlxs123/MediaFlow-Releases"
+    }
+  ],
+  "release": {
+    "release_url": "https://github.com/xlxs123/MediaFlow-Releases/releases/tag/v2.1.0",
+    "release_id": 421736487,
+    "published_at": "2026-10-23T11:05:33Z",
+    "tag": "v2.1.0"
+  },
+  "assets": [
+    {
+      "name": "MediaFlow-2.1.0-20261023T075252Z-50a032a34533.zip",
+      "size": 371249271,
+      "sha256": "ab560859e0b7be22b5b2cfa2f50f9b3fc63c5489c2bd8c4246dd1c0e4b407b6c",
+      "url": "https://github.com/xlxs123/MediaFlow-Releases/releases/download/v2.1.0/MediaFlow-2.1.0-20261023T075252Z-50a032a34533.zip"
+    },
+    {
+      "name": "manifest.json",
+      "size": 32759,
+      "sha256": "580c204f3048c3443f51c6199ee25a62bb9f88d158cdced832bc41ae6632bf44",
+      "url": "https://github.com/xlxs123/MediaFlow-Releases/releases/download/v2.1.0/manifest.json"
+    },
+    {
+      "name": "manifest.sig",
+      "size": 465,
+      "sha256": "d69ab42cf40bf808f4a66670ff467f8f18ea3b45671ef07ca7cfc5e7c393e864",
+      "url": "https://github.com/xlxs123/MediaFlow-Releases/releases/download/v2.1.0/manifest.sig"
+    },
+    {
+      "name": "release.json",
+      "size": 32759,
+      "sha256": "580c204f3048c3443f51c6199ee25a62bb9f88d158cdced832bc41ae6632bf44",
+      "url": "https://github.com/xlxs123/MediaFlow-Releases/releases/download/v2.1.0/release.json"
+    },
+    {
+      "name": "signature.json",
+      "size": 465,
+      "sha256": "d69ab42cf40bf808f4a66670ff467f8f18ea3b45671ef07ca7cfc5e7c393e864",
+      "url": "https://github.com/xlxs123/MediaFlow-Releases/releases/download/v2.1.0/signature.json"
+    },
+    {
+      "name": "MediaFlow-2.1.0-BtbN-sources-01-of-02.zip",
+      "size": 1749511596,
+      "sha256": "8e51663b9049cc3a01dfcf827f1c8583a6ebafc60786f3616cad0eaa5ea7e2d2",
+      "url": "https://github.com/xlxs123/MediaFlow-Releases/releases/download/v2.1.0/MediaFlow-2.1.0-BtbN-sources-01-of-02.zip"
+    },
+    {
+      "name": "MediaFlow-2.1.0-BtbN-sources-02-of-02.zip",
+      "size": 456675247,
+      "sha256": "7c3cf55fb7468f0f034a8dedec30398ddde220da002c791be117200a2d8def43",
+      "url": "https://github.com/xlxs123/MediaFlow-Releases/releases/download/v2.1.0/MediaFlow-2.1.0-BtbN-sources-02-of-02.zip"
+    },
+    {
+      "name": "MediaFlow-2.1.0-Python-and-yt-dlp-sources.tar.gz",
+      "size": 93168131,
+      "sha256": "c5a5098d99a1fe52b0309404d7a1a3ba610721680776449039b1181615c47434",
+      "url": "https://github.com/xlxs123/MediaFlow-Releases/releases/download/v2.1.0/MediaFlow-2.1.0-Python-and-yt-dlp-sources.tar.gz"
+    },
+    {
+      "name": "qt-everywhere-src-6.11.2.tar.xz",
+      "size": 1019661552,
+      "sha256": "6dcfbca271d76a6502741a2c0dc6fc98ef7dd0b7b4cfd0abcebb285a86a26f33",
+      "url": "https://github.com/xlxs123/MediaFlow-Releases/releases/download/v2.1.0/qt-everywhere-src-6.11.2.tar.xz"
+    },
+    {
+      "name": "btbn-source-bundle-index.json",
+      "size": 85833,
+      "sha256": "3a4faadccb8b709a3173f0ed66a02b40a6a9ebab96bd6a62ec93c69afcb5e774",
+      "url": "https://github.com/xlxs123/MediaFlow-Releases/releases/download/v2.1.0/btbn-source-bundle-index.json"
+    },
+    {
+      "name": "BTBN-SOURCE-SHA256SUMS.txt",
+      "size": 405,
+      "sha256": "98e7ad37def1e8537176cc6c023b3319decac7d8f6a6066b2ee46ae7d3bf55ea",
+      "url": "https://github.com/xlxs123/MediaFlow-Releases/releases/download/v2.1.0/BTBN-SOURCE-SHA256SUMS.txt"
+    },
+    {
+      "name": "README-BtbN-SOURCE.txt",
+      "size": 4651,
+      "sha256": "8a894af25984b5d75f24345a101e121cb3fcc1bdf3f577eb76fc6905a8cabf9f",
+      "url": "https://github.com/xlxs123/MediaFlow-Releases/releases/download/v2.1.0/README-BtbN-SOURCE.txt"
+    },
+    {
+      "name": "RELEASE_NOTES.md",
+      "size": 2544,
+      "sha256": "6de971e6032ad437e80bafa28c6872fffa608a71543c386caf90af84acb55d2a",
+      "url": "https://github.com/xlxs123/MediaFlow-Releases/releases/download/v2.1.0/RELEASE_NOTES.md"
+    }
+  ],
+  "unit_tests": {
+    "passed": true,
+    "tests": 260,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 1
+  },
+  "additional_publisher_tests": {
+    "tests": 11,
+    "passed": true,
+    "scope": "isolated synthetic subprocess/unit tests"
+  },
+  "native_local": {
+    "passed": true,
+    "scope": "local HTTPS integration and actual packaged EXE",
+    "phases": {
+      "protocols": {
+        "checks": 67,
+        "outputs": 10,
+        "saved_media": 5
+      },
+      "protocol_restart": {
+        "checks": 16
+      },
+      "signed_native": {
+        "checks": 91,
+        "ui_peak_gap_seconds": 0.5849619999935385,
+        "launched": 3
+      },
+      "signed_restart": {
+        "checks": 15
+      },
+      "recover_before": {
+        "checks": 17
+      },
+      "recover_after": {
+        "checks": 15
+      }
+    },
+    "local_https_requests": 12,
+    "elapsed_seconds": 626.573,
+    "production_key_used": false
+  },
+  "real_public_client": {
+    "passed": true,
+    "public_online_verified": true,
+    "started_at": "2026-10-23T11:08:01.077470+00:00",
+    "ended_at": "2026-10-23T11:11:01.525434+00:00",
+    "elapsed_seconds_including_process_start": 207.48,
+    "checks": [
+      {
+        "passed": true,
+        "description": "Actual packaged 2.1.0 updater"
+      },
+      {
+        "passed": true,
+        "description": "Embedded formal trust is initialized"
+      },
+      {
+        "passed": true,
+        "description": "Actual created public release repository is the embedded channel"
+      },
+      {
+        "passed": true,
+        "description": "Repository accessible without authentication",
+        "repository": "MediaFlow"
+      },
+      {
+        "passed": true,
+        "description": "Repository accessible without authentication",
+        "repository": "MediaFlow-Releases"
+      },
+      {
+        "passed": true,
+        "description": "Actual current client verifies and finds its published stable version",
+        "status": "up_to_date"
+      },
+      {
+        "passed": true,
+        "description": "Public detached signature matches verified manifest"
+      },
+      {
+        "passed": true,
+        "description": "Tampered remote manifest is rejected"
+      },
+      {
+        "passed": true,
+        "description": "Acceptance does not take over foreground UI"
+      },
+      {
+        "passed": true,
+        "description": "Public update discovery requested"
+      },
+      {
+        "passed": true,
+        "description": "Public update discovery returned a real successful result"
+      },
+      {
+        "passed": true,
+        "description": "Signed stable version compares newer than preserved installation"
+      },
+      {
+        "passed": true,
+        "description": "Real public package download and validation requested"
+      },
+      {
+        "passed": true,
+        "description": "Real public package download and validation returned a real successful result"
+      },
+      {
+        "passed": true,
+        "description": "Downloaded ZIP identity and formal signature validated"
+      },
+      {
+        "passed": true,
+        "description": "Public ZIP actual size and full SHA-256 match signed manifest"
+      },
+      {
+        "passed": true,
+        "description": "Tampered real downloaded ZIP refused before extraction or deployment"
+      },
+      {
+        "passed": true,
+        "description": "Original downloaded package restored and full digest rechecked for positive deployment"
+      },
+      {
+        "passed": true,
+        "description": "Deployment requires separate confirmation"
+      },
+      {
+        "passed": true,
+        "description": "Independent version deployment requested"
+      },
+      {
+        "passed": true,
+        "description": "Independent version deployment returned a real successful result"
+      },
+      {
+        "passed": true,
+        "description": "New and old releases are separate"
+      },
+      {
+        "passed": true,
+        "description": "Actual new EXE startup health requested"
+      },
+      {
+        "passed": true,
+        "description": "Actual new EXE startup health returned a real successful result"
+      },
+      {
+        "passed": true,
+        "description": "Deployed EXE actually runs and reports expected build"
+      },
+      {
+        "passed": true,
+        "description": "Health check preserves real private database/task/profile bytes"
+      },
+      {
+        "passed": true,
+        "description": "Actual new GUI launch requested"
+      },
+      {
+        "passed": true,
+        "description": "Actual new GUI launch returned a real successful result"
+      },
+      {
+        "passed": true,
+        "description": "Actual GUI stays running and initializes private media library",
+        "version": "2.1.0"
+      },
+      {
+        "passed": true,
+        "description": "Launched GUI media library is readable",
+        "version": "2.1.0"
+      },
+      {
+        "passed": true,
+        "description": "Repeated same signed operation revalidates existing deployment without overwrite"
+      },
+      {
+        "passed": true,
+        "description": "Actual old GUI rollback requested"
+      },
+      {
+        "passed": true,
+        "description": "Actual old GUI rollback returned a real successful result"
+      },
+      {
+        "passed": true,
+        "description": "Actual GUI stays running and initializes private media library",
+        "version": "2.0.1"
+      },
+      {
+        "passed": true,
+        "description": "Launched GUI media library is readable",
+        "version": "2.0.1"
+      },
+      {
+        "passed": true,
+        "description": "Preserved old release is byte-for-byte unchanged"
+      },
+      {
+        "passed": true,
+        "description": "Old database/history/tasks/media/profile fixture bytes unchanged"
+      },
+      {
+        "passed": true,
+        "description": "Restarted update manager recovers actual deployed version state"
+      }
+    ],
+    "real_running_updater_version": "2.1.0",
+    "preserved_installation_context_version": "2.0.1",
+    "actual_gui_versions": [
+      "2.1.0",
+      "2.0.1"
+    ],
+    "ui_maximum_gap_seconds": 0.18726690000039525,
+    "heartbeat_ticks": 5744,
+    "authentication": "system TLS, embedded formal Ed25519 public key; anonymous public URLs; no test CA or credential"
+  },
+  "ci": {
+    "databaseId": 39945048074,
+    "headSha": "2b44ab840c4d331362ca6d5fd2d191e9c0908573",
+    "status": "completed",
+    "conclusion": "success",
+    "url": "https://github.com/xlxs123/MediaFlow/actions/runs/39945048074",
+    "focused_tests": {
+      "passed": true,
+      "groups": [
+        {
+          "passed": true,
+          "group": "core",
+          "tests": 242,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "source_sha256": "50a032a34533e7dac91f71a2a672c9a14cbbead155400ba4c882dda87de3d97f",
+          "source_unchanged": true,
+          "channel_fixture": "unconfigured; channel tests explicitly override with test roots",
+          "skips": [],
+          "unexpected_skips": [],
+          "exit_code": 0,
+          "elapsed_seconds": 67.924
+        },
+        {
+          "passed": true,
+          "group": "ui",
+          "tests": 17,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "source_sha256": "50a032a34533e7dac91f71a2a672c9a14cbbead155400ba4c882dda87de3d97f",
+          "source_unchanged": true,
+          "channel_fixture": "unconfigured; channel tests explicitly override with test roots",
+          "skips": [],
+          "unexpected_skips": [],
+          "exit_code": 0,
+          "elapsed_seconds": 2.01
+        },
+        {
+          "passed": true,
+          "group": "output",
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "source_sha256": "50a032a34533e7dac91f71a2a672c9a14cbbead155400ba4c882dda87de3d97f",
+          "source_unchanged": true,
+          "channel_fixture": "unconfigured; channel tests explicitly override with test roots",
+          "skips": [],
+          "unexpected_skips": [],
+          "exit_code": 0,
+          "elapsed_seconds": 1.708
+        }
+      ],
+      "source_sha256": "50a032a34533e7dac91f71a2a672c9a14cbbead155400ba4c882dda87de3d97f",
+      "source_unchanged": true,
+      "tests": 271,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "release_structure": {
+      "schema_version": 1,
+      "product": "MediaFlow",
+      "passed": true,
+      "version": "2.1.0",
+      "build_id": "20261023T111933Z-50a032a34533",
+      "source_sha256": "50a032a34533e7dac91f71a2a672c9a14cbbead155400ba4c882dda87de3d97f",
+      "files": 190,
+      "total_bytes": 575820207,
+      "runtime_identity_verified": true,
+      "native_exe_executed": false,
+      "signed": false,
+      "published": false,
+      "scope": "portable release structure and public-data hygiene"
+    },
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Checkout source",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Install Python 3.14 x64",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Install pinned dependencies",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Basic source and structure-checker tests",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Prepare verified portable tools",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Update, signature, deployment and rollback regression",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Build an independent Windows folder",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Start the packaged EXE and check complete release structure",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Retain passed build and public summaries",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Retain failed-test summary",
+        "status": "completed",
+        "conclusion": "skipped"
+      },
+      {
+        "name": "Post Install Python 3.14 x64",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Post Checkout source",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ],
+    "artifact": {
+      "id": 12497522862,
+      "name": "MediaFlow-2.1.0-windows-x64-ci-39945048074",
+      "size_in_bytes": 371359994,
+      "digest": "sha256:7100c940fa1bf7f4027d594d7e77b54f4ea225414099ac4b24414d14a31d9d5f",
+      "expired": false,
+      "expires_at": "2026-10-30T11:21:39Z"
+    }
+  },
+  "preservation": {
+    "passed": true,
+    "files": 982,
+    "bytes": 1558910210,
+    "changed": 0,
+    "known_data_root_presence_unchanged": true,
+    "unchanged_existing_core_ui_utils_modules": 98
+  },
+  "scope_limits": [
+    "Untouched 2.0.1 does not contain the GitHub CDN adapter; first adoption requires running 2.1.0.",
+    "Ed25519 authenticates update manifests; Windows Authenticode signing was not performed.",
+    "Saved website media was verified offline; no new login or website discovery acceptance is claimed.",
+    "The protected publisher vault is tied to the Windows user; independent backup and user recovery are needed.",
+    "Some historical documents in the immutable signed ZIP describe earlier unconfigured versions; current source documents and this report supersede those status statements.",
+    "Corresponding source is supplied with the documented upstream build-helper limitation; no bit-identical rebuild claim."
+  ]
+}
