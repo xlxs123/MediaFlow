@@ -175,7 +175,8 @@ class OutputIntegrationTests(unittest.TestCase):
         with patch.dict(os.environ,{'APPDATA':str(self.root)}):
             old=self.root/'MediaFlow'/'config.json';old.parent.mkdir();old.write_text('{"output_directory":"G:/my-media"}')
             before=old.read_bytes();store=ConfigStore();values=store.load()
-            self.assertEqual(store.path.parent,self.root/'MediaFlow'/'2.0.1')
+            from utils.branding import APP_VERSION
+            self.assertEqual(store.path.parent,self.root/'MediaFlow'/APP_VERSION)
             self.assertEqual(values['output_directory'],DEFAULTS['output_directory'])
             values['organization']={'filename_template':'{title}.{ext}','classification':'site'}
             store.save(values)

@@ -60,6 +60,14 @@ class PublicSourceAuditTests(unittest.TestCase):
         self.assertFalse(result['passed'])
         self.assertIn('review_hash_stale', [item['rule'] for item in result['findings']])
 
+    def test_http_header_literal_needs_review_without_a_dictionary_assignment(self):
+        name = 'tests/test_header_fixture.py'
+        self.file(name, "request = 'Cookie: synthetic-header-value'\n")
+        result = audit(self.root, candidates=[name])
+        self.assertFalse(result['passed'])
+        self.assertEqual(result['findings'][0]['rule'], 'credential_header_literal')
+        self.assertTrue(audit(self.root, candidates=[name], reviews=self.review(name))['passed'])
+
     def test_full_private_key_blocks_and_token_shapes_cannot_be_reviewed_away(self):
         name = 'tests/test_bad_material.py'
         marker = '-----' + 'BEGIN PRIVATE KEY' + '-----'

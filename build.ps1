@@ -94,13 +94,24 @@ if (-not $identity.storage_module_loaded -or $identity.storage_feature_revision 
 }
 # The real EXE report above is verified before producing the portable stamp.
 # Machine-specific runtime paths belong only in private acceptance reports.
-$identity.PSObject.Properties.Remove('executable')
-$identity.PSObject.Properties.Remove('runtime_root')
-[IO.File]::WriteAllText($identityFile, ($identity | ConvertTo-Json -Depth 12), [Text.UTF8Encoding]::new($false))
+Invoke-Checked $venvPython @('-c', 'import json,sys; from pathlib import Path; p=Path(sys.argv[1]); d=json.loads(p.read_text(encoding="utf-8")); d.pop("executable",None); d.pop("runtime_root",None); p.write_text(json.dumps(d,ensure_ascii=False,indent=2),encoding="utf-8")', $identityFile)
 $licenseSource = (& $venvPython -c 'import pathlib, PySide6; print(pathlib.Path(PySide6.__file__).resolve().parent.parent)').Trim()
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $licenseSource)) { throw '无法定位实际 Qt 依赖许可目录。' }
 $licenseTarget = Join-Path $distributionRoot 'licenses'
 New-Item -ItemType Directory -Path $licenseTarget -Force | Out-Null
+$pythonLicense = (& $venvPython -c 'import pathlib,sys; print(pathlib.Path(sys.base_prefix) / "LICENSE.txt")').Trim()
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $pythonLicense)) { throw '缺少实际 CPython 运行时许可证。' }
+$pythonLicenseTarget = Join-Path $licenseTarget 'Python'
+New-Item -ItemType Directory -Path $pythonLicenseTarget -Force | Out-Null
+Copy-Item -LiteralPath $pythonLicense -Destination (Join-Path $pythonLicenseTarget 'LICENSE.txt') -Force
+$pyinstallerLicense = (& $venvPython -c 'import importlib.metadata as m; d=m.distribution("pyinstaller"); print(d.locate_file(next(p for p in d.files if str(p).endswith("licenses/COPYING.txt"))))').Trim()
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $pyinstallerLicense)) { throw '缺少实际 PyInstaller 分发例外与许可。' }
+$pyinstallerLicenseTarget = Join-Path $licenseTarget 'PyInstaller'
+New-Item -ItemType Directory -Path $pyinstallerLicenseTarget -Force | Out-Null
+Copy-Item -LiteralPath $pyinstallerLicense -Destination (Join-Path $pyinstallerLicenseTarget 'COPYING.txt') -Force
+foreach ($sourceDocument in @('THIRD_PARTY_SOURCES.md', 'third-party-sources.json')) {
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot ('docs\' + $sourceDocument)) -Destination $licenseTarget -Force
+}
 $browserNotices = Join-Path $PSScriptRoot 'verification\browser-licenses'
 $browserLicenseTarget = Join-Path $licenseTarget 'QtWebEngine'
 New-Item -ItemType Directory -Path $browserLicenseTarget -Force | Out-Null

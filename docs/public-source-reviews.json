@@ -1025,18 +1025,19 @@
     },
     {
       "path": "tests/test_public_source_audit.py",
-      "sha256": "5500aa041378aec500f122ad9719d5645edebeaad5bed95e36cecc8f1a1c400a",
+      "sha256": "748545ac639c5f8bd61047238da2257ff31248354667d8ad017d56fdbe341a1e",
       "classification": "synthetic_test_data",
       "reviewed_by": "Codex source disclosure review",
-      "reason": "复核本文件现场构造无效凭据形态、私钥标记和个人路径负例；完整私钥形态由无密码学意义的字符串在临时目录组合。",
+      "reason": "复核本文件现场构造无效凭据形态、私钥标记和个人路径负例；完整私钥形态由无密码学意义的字符串在临时目录组合。 主代理复核新增独立 HTTP 头合成负例；标记是临时夹具和运行时生成的测试密钥，不是实际凭据。",
       "reviewed_lines": [
         45,
         56,
         58,
-        79,
-        149,
-        156,
-        186
+        65,
+        87,
+        157,
+        164,
+        194
       ],
       "reviewed_rules": [
         "credential_literal",
@@ -1469,5 +1470,6 @@
         "credential_literal"
       ]
     }
-  ]
+  ],
+  "baseline_note": "The index snapshot records the original review baseline; each explicitly reviewed current file is bound by its own SHA-256."
 }

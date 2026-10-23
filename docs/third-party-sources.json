@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "product": "MediaFlow",
+  "version": "2.1.0",
+  "license_scope": "MIT application source; external components retain their own licenses",
+  "source_repository": "https://github.com/xlxs123/MediaFlow",
+  "assets": [
+    {
+      "name": "MediaFlow-2.1.0-BtbN-sources-01-of-02.zip",
+      "size": 1749511596,
+      "sha256": "8e51663b9049cc3a01dfcf827f1c8583a6ebafc60786f3616cad0eaa5ea7e2d2",
+      "role": "FFmpeg corresponding source inputs",
+      "url": "https://github.com/xlxs123/MediaFlow-Releases/releases/download/v2.1.0/MediaFlow-2.1.0-BtbN-sources-01-of-02.zip"
+    },
+    {
+      "name": "MediaFlow-2.1.0-BtbN-sources-02-of-02.zip",
+      "size": 456675247,
+      "sha256": "7c3cf55fb7468f0f034a8dedec30398ddde220da002c791be117200a2d8def43",
+      "role": "FFmpeg corresponding source inputs",
+      "url": "https://github.com/xlxs123/MediaFlow-Releases/releases/download/v2.1.0/MediaFlow-2.1.0-BtbN-sources-02-of-02.zip"
+    },
+    {
+      "name": "MediaFlow-2.1.0-Python-and-yt-dlp-sources.tar.gz",
+      "size": 93168131,
+      "sha256": "c5a5098d99a1fe52b0309404d7a1a3ba610721680776449039b1181615c47434",
+      "role": "Python/yt-dlp/PySide sources",
+      "url": "https://github.com/xlxs123/MediaFlow-Releases/releases/download/v2.1.0/MediaFlow-2.1.0-Python-and-yt-dlp-sources.tar.gz"
+    },
+    {
+      "name": "qt-everywhere-src-6.11.2.tar.xz",
+      "size": 1019661552,
+      "sha256": "6dcfbca271d76a6502741a2c0dc6fc98ef7dd0b7b4cfd0abcebb285a86a26f33",
+      "role": "Qt 6.11.2 sources",
+      "url": "https://github.com/xlxs123/MediaFlow-Releases/releases/download/v2.1.0/qt-everywhere-src-6.11.2.tar.xz"
+    },
+    {
+      "name": "btbn-source-bundle-index.json",
+      "size": 85833,
+      "sha256": "3a4faadccb8b709a3173f0ed66a02b40a6a9ebab96bd6a62ec93c69afcb5e774",
+      "role": "Source inventory and rebuilding directions",
+      "url": "https://github.com/xlxs123/MediaFlow-Releases/releases/download/v2.1.0/btbn-source-bundle-index.json"
+    },
+    {
+      "name": "BTBN-SOURCE-SHA256SUMS.txt",
+      "size": 405,
+      "sha256": "98e7ad37def1e8537176cc6c023b3319decac7d8f6a6066b2ee46ae7d3bf55ea",
+      "role": "Source inventory and rebuilding directions",
+      "url": "https://github.com/xlxs123/MediaFlow-Releases/releases/download/v2.1.0/BTBN-SOURCE-SHA256SUMS.txt"
+    },
+    {
+      "name": "README-BtbN-SOURCE.txt",
+      "size": 4651,
+      "sha256": "8a894af25984b5d75f24345a101e121cb3fcc1bdf3f577eb76fc6905a8cabf9f",
+      "role": "Source inventory and rebuilding directions",
+      "url": "https://github.com/xlxs123/MediaFlow-Releases/releases/download/v2.1.0/README-BtbN-SOURCE.txt"
+    }
+  ],
+  "ffmpeg": {
+    "binary_version": "n9.0.2-33-g4cf298e66a-20261022",
+    "recipe_commit": "937868360a21d711ec94a33f5591d345ad9b7754",
+    "workflow_run": 39776938430,
+    "selected_cache_archives": 103,
+    "actual_upstream_cache_mounts_covered": 98,
+    "missing_cache_mounts": 0,
+    "rav1e_registry_sources": 273
+  },
+  "limitations": [
+    "Upstream cargo update cc historical build-helper resolution is not recorded by its cached layer; generic toolchain is not rebuilt and byte-identical binary reproduction is not asserted."
+  ]
+}
