@@ -47,7 +47,8 @@ class UpdateManagerTests(unittest.TestCase):
     def setUp(self):
         self.temporary=tempfile.TemporaryDirectory(prefix='MediaFlow-update-test-')
         self.addCleanup(self.temporary.cleanup)
-        self.root=Path(self.temporary.name)
+        # Windows runners may expose TEMP through an 8.3 alias; match runtime canonical paths.
+        self.root=Path(self.temporary.name).resolve()
         self.old=self.root/'old-release'; self.old.mkdir()
         (self.old/'MediaFlow.exe').write_bytes(b'MZ-old-untouched')
         self.data=self.root/'old-data'; self.data.mkdir()

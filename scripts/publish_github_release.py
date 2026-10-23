@@ -21,7 +21,7 @@ if __package__ in ('',None): sys.path.insert(0,str(ROOT))
 from core.update_channel import load_channel
 from core.update_manifest import validate_manifest, canonical_bytes, parse_version
 from core.data_migration import frozen_file
-from scripts.publish_release import _read_document
+from scripts.publish_release import _read_document, _save_new
 
 
 class PublicationError(RuntimeError):
@@ -73,7 +73,7 @@ def prepare_assets(directory,repository,extras):
         if path.exists():
             if plain(path).read_bytes()!=data:raise PublicationError('Alias already exists with different bytes; preserving it.')
         else:
-            with path.open('xb') as f:f.write(data)
+            _save_new(path,data)
     assets=[package,directory/'manifest.json',directory/'manifest.sig',directory/'release.json',directory/'signature.json']
     assets += [plain(path) for path in extras]
     names=[p.name.casefold() for p in assets]

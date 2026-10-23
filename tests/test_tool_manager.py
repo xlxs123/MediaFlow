@@ -27,7 +27,8 @@ class ToolManagerTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
+        # Windows runners may expose TEMP through an 8.3 alias; match runtime canonical paths.
+        self.root = Path(self.temp.name).resolve()
         self.manager = tools.ToolManager(self.root / 'app', run_timeout=0.3, total_timeout=1.5)
         self.path_patch = patch('core.tool_manager.shutil.which', return_value=None)
         self.path_patch.start()
