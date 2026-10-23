@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "product": "MediaFlow",
+  "channel": "stable",
+  "source_url": "https://github.com/xlxs123/MediaFlow-Releases/releases/latest/download/manifest.json",
+  "trusted_keys": {
+    "mediaflow-stable-2026-01": {
+      "algorithm": "ed25519",
+      "public_key": "6HqXD6+PHV5yEqPoxWS65aRS2tF43tqXDlbxgb6EMn0="
+    }
+  },
+  "key_state": "initialized"
+}

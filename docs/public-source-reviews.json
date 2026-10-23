@@ -1,0 +1,1473 @@
+{
+  "schema_version": 1,
+  "selection": "git_index",
+  "index_snapshot_sha256": "22d47696f036a9b5969d04cc63c1b64133f70fa9f84b853d87e1f735d3307d8d",
+  "scope": "人工复核所列规则的代码上下文、合成值与临时夹具来源；不声称穷尽所有秘密或完成二进制许可合规。",
+  "reviews": [
+    {
+      "path": "core/curl_parser.py",
+      "sha256": "32352dff17309e5a398513a02fb41754d70eb2066914392feee0990ecbd730d9",
+      "classification": "security_code",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核该行是 cURL 选项名称到内部字段名的映射，cookie 字符串只是解析标签，不是请求凭据。",
+      "reviewed_lines": [
+        458
+      ],
+      "reviewed_rules": [
+        "credential_literal"
+      ]
+    },
+    {
+      "path": "scripts/publish_release.py",
+      "sha256": "3efaf7b6e193c965f95c147886649567d21303f0c5e390bfcd55f89e09de1117",
+      "classification": "security_code",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核加密 PEM 格式检测与显式 init-key 路径；文件不含私钥字节，初始化仅在用户明确操作时于外部目录运行并加密保存。",
+      "reviewed_lines": [
+        256,
+        379,
+        381
+      ],
+      "reviewed_rules": [
+        "private_key_generation",
+        "private_key_marker"
+      ]
+    },
+    {
+      "path": "tests/batch_fixture.py",
+      "sha256": "bd4a5f282941666741a8a0aa8f42a6977030d4182feb91a41dcaa1ae8726513e",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 HlsFixture 构造与本地 HTTP 页面、FFmpeg 生成样本；所有查询值由本地 fixture 写入，不是网页捕获地址。",
+      "reviewed_lines": [
+        62,
+        135
+      ],
+      "reviewed_rules": [
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/browser_environment_smoke.py",
+      "sha256": "213be1229cdc0cfc45d09814ac5df313600868c7fada64ab5579adad6a81e876",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核浏览器 cookie 由本地测试页面 document.cookie 设置 fixture 值，用于持久化测试，不读取真实登录配置。",
+      "reviewed_lines": [
+        96
+      ],
+      "reviewed_rules": [
+        "credential_literal"
+      ]
+    },
+    {
+      "path": "tests/discovery_fixture.py",
+      "sha256": "b0ecdc03ed79fbbff591e189ef4a9901113e64905040f4c3e8cf7dc70ae7fab9",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 SIGNATURE_QUERY、AUTH_HEADER、COOKIE_VALUE 是文件开头明示的固定 fixture 常量；页面和请求均由本地测试服务器构造。",
+      "reviewed_lines": [
+        14,
+        130,
+        200
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/discovery_smoke.py",
+      "sha256": "4dc449ae6a69da7bf5e0a7f3ca91e7d4daa7be5db44832c99f24ae8ae192cd5d",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 untouched.test 输入用于证明查找取消不覆盖原始输入，敏感参数为测试字符串，没有真实授权来源。",
+      "reviewed_lines": [
+        107
+      ],
+      "reviewed_rules": [
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/gui_smoke.py",
+      "sha256": "ee55612bed45a70b2792427b357fe3ed299a7cf3e29ba4dda29781a08c9b0197",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 URL 来自本地 HlsFixture，伪 Cookie 用于本地成功及错误请求差异测试。",
+      "reviewed_lines": [
+        77,
+        145
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/hls_fixture.py",
+      "sha256": "01b731640fecd55303789da0e20e531479fb7eaa079c6d1db0072eb46ca8dc6e",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 FIXTURE_HEADERS 与本地 HTTPHandler；Cookie、Bearer 与 API 标签均明确为 fixture 值，跳转签名也由本地服务器构造。",
+      "reviewed_lines": [
+        17,
+        18,
+        193,
+        294,
+        349
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/integration_hls.py",
+      "sha256": "c22ab2ffedbf9ed38fbd4e4c60b43a46b34c9949525e8e40c539f3332cfd2870",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核请求都来自 HlsFixture 本地地址及固定合成请求头，用于加密 HLS、重定向和签名保持测试。",
+      "reviewed_lines": [
+        79,
+        85,
+        97
+      ],
+      "reviewed_rules": [
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/integration_queue.py",
+      "sha256": "36a0a0341f1c1d4fcbfa4831fe7981fc9a486d673e04a095373b641c34492d3d",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核调用本地媒体 fixture 并主动注入错误合成请求头验证队列隔离，不读取会话凭据。",
+      "reviewed_lines": [
+        78
+      ],
+      "reviewed_rules": [
+        "credential_literal"
+      ]
+    },
+    {
+      "path": "tests/migration_acceptance.py",
+      "sha256": "722963589e68b1246bc98333d354021204401897c8d9d2d4aaaa5817d9f4f24d",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 document.cookie 设置本地 fixture 值，仅验证用户数据迁移测试中的浏览器持久性。",
+      "reviewed_lines": [
+        114
+      ],
+      "reviewed_rules": [
+        "credential_literal"
+      ]
+    },
+    {
+      "path": "tests/resolver_fixture.py",
+      "sha256": "56e10170c3f5a46c39803d323d84613b10b095c21010aa36556ddfdabfe517ce",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 ResolverFixture 创建本地媒体服务器，token 为 fixture 自身生成的本地访问状态，与网站 Cookie 无关。",
+      "reviewed_lines": [
+        46
+      ],
+      "reviewed_rules": [
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/rou_current_fixture.py",
+      "sha256": "6cd9ddb747d6e4bdb13e6e31ac959acb166740edb29d86b75e4ca8d86d08fe6f",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 CurrentRouFixture 的本地授权 cookie 为明示合成常量，仅在自建 HTTPHandler 中校验。",
+      "reviewed_lines": [
+        30
+      ],
+      "reviewed_rules": [
+        "credential_literal"
+      ]
+    },
+    {
+      "path": "tests/test_batch_controller.py",
+      "sha256": "a8c48c9c87a69c633b2698041d3e535492e8f65a6247406da0faf38227625cd6",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核候选来自 cdn.example.test，过期和刷新 URL 为单测固定值，验证同一任务与断点目录身份。",
+      "reviewed_lines": [
+        69,
+        326
+      ],
+      "reviewed_rules": [
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_batch_discovery.py",
+      "sha256": "0c299dd4dc8f60da791b21fd2d3643374ca11a959d05e5e34590bfc8b5e2bc63",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核候选构造函数只创建 example.test 请求，用于不同页面和批次候选隔离测试。",
+      "reviewed_lines": [
+        27
+      ],
+      "reviewed_rules": [
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_batch_download.py",
+      "sha256": "6beb9af4b2642ee5832afeab541e4092ef03e0ab0e1f766dce308b3b86894352",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 cdn.example 合成候选、伪请求头及新旧签名，验证批量去重和已有下载入口参数。",
+      "reviewed_lines": [
+        30,
+        49,
+        107,
+        110
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_batch_input.py",
+      "sha256": "56db2d97e3fcc7577d73b886a985d9f840b46d39679f25e29e97b218e3a2816f",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核含 URL 用户信息的输入是非法网址拒绝用例，使用 example.test，不是客户端凭据配置。",
+      "reviewed_lines": [
+        33
+      ],
+      "reviewed_rules": [
+        "url_credentials"
+      ]
+    },
+    {
+      "path": "tests/test_batch_integration.py",
+      "sha256": "1bb2ba0e30ab0b5dd1dc226987fb79224df3f5c808afe7546507fbb0167f087c",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 example.test URL 与伪 Cookie/Authorization 被主动注入，用于验证设置白名单及失败历史脱敏。",
+      "reviewed_lines": [
+        67,
+        94,
+        110,
+        116
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_batch_store.py",
+      "sha256": "527c616a75434fe42481d1bd3a293efd5231e569d5f91688fb1e87fb9495e3c0",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 Douyin URL 的作品 ID 是公开页面样本，token 为明示 private-source-token 假值；其他凭据字段用于加密失败和字段丢弃断言。",
+      "reviewed_lines": [
+        34,
+        97,
+        121,
+        122,
+        126,
+        127,
+        212
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "sensitive_url_literal",
+        "url_credentials"
+      ]
+    },
+    {
+      "path": "tests/test_batch_widgets.py",
+      "sha256": "cf9ae025806f1e32d9cb762e6732b60d8dc90e1f7d1569bb62528cdbb9895f68",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核两个 Douyin 公开作品页附加 secret-one/secret-two 合成值，用于 ID 保留与预览脱敏，其他用户信息使用 example.com。",
+      "reviewed_lines": [
+        85,
+        86,
+        123,
+        130
+      ],
+      "reviewed_rules": [
+        "sensitive_url_literal",
+        "url_credentials"
+      ]
+    },
+    {
+      "path": "tests/test_brand_migration.py",
+      "sha256": "840cb6d85c0cd31f2ffddec51f955d4795d737ddddd2b11626d27adbd28827f6",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 legacy 配置在 TemporaryDirectory 中构造，Cookie 是禁止自动导入的单测字段。 主代理复核新版本路径改为 APP_VERSION 或结构门禁异常契约修正，原有合成测试来源不变。",
+      "reviewed_lines": [
+        29
+      ],
+      "reviewed_rules": [
+        "credential_literal"
+      ]
+    },
+    {
+      "path": "tests/test_browser_controls.py",
+      "sha256": "8c00e3359f76f06f2afde8ce9963daaafa1bdc215bf4da5ffa002f54e43896f5",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核异常脚本结果主动构造合成 Cookie/secret，断言不会把网页原始值显示给用户。",
+      "reviewed_lines": [
+        251
+      ],
+      "reviewed_rules": [
+        "credential_header_literal"
+      ]
+    },
+    {
+      "path": "tests/test_browser_cookies.py",
+      "sha256": "c87e354aafb7e7fcb7fc9239c99a6e0082f3ad8bcd04c299235fb5e0d478c6f5",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 synthetic cookie 文件与本地 Firefox 测试数据库在临时目录生成；无效 URL 用户信息及 token 仅测试拒绝、作用域和脱敏。",
+      "reviewed_lines": [
+        174,
+        210
+      ],
+      "reviewed_rules": [
+        "sensitive_url_literal",
+        "url_credentials"
+      ]
+    },
+    {
+      "path": "tests/test_browser_observer.py",
+      "sha256": "fe4d6ec1ec8220f7072cae49c57469c512ebc9dfdd08422adc41c6ec4f55285a",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核模拟 CDP 事件中 Cookie、Authorization、签名与错误值均手工构造于 example 域；覆盖 iframe/worker、重定向及错误脱敏。",
+      "reviewed_lines": [
+        21,
+        48,
+        49,
+        98,
+        173,
+        194,
+        195,
+        197,
+        203,
+        217,
+        228,
+        229,
+        255,
+        256,
+        288,
+        372,
+        395,
+        400,
+        401,
+        405,
+        534,
+        552,
+        938,
+        939,
+        1184
+      ],
+      "reviewed_rules": [
+        "credential_header_literal",
+        "credential_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_cache_streaming.py",
+      "sha256": "2dcd95e8676e1c9955d742f28f1f9afcee3c569c4bde6ee3dfe32c183593a5c2",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核真实本地 HTTP 断点服务器，合成请求头及查询仅用于检验缓存、验证器和日志脱敏。",
+      "reviewed_lines": [
+        109,
+        137,
+        261
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_candidate_display_ui.py",
+      "sha256": "3b8653c16a7e8e25d4a6d14af958acb27bfb13a1155ffeedd321c97b9e509bf3",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 cdn.example 请求头和签名只作为候选理由 tooltip 的脱敏断言输入。",
+      "reviewed_lines": [
+        172,
+        173
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_candidate_flow.py",
+      "sha256": "201e3f4a03d37b6c0303ce6507028c15508637a7c4373293ff53b69de84f3161",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核网络候选由测试辅助方法构造，private Cookie 是固定伪值，用于生命周期与分组。",
+      "reviewed_lines": [
+        94
+      ],
+      "reviewed_rules": [
+        "credential_literal"
+      ]
+    },
+    {
+      "path": "tests/test_config.py",
+      "sha256": "af4ac63eb6d132132ec5a98a658bdb3deddb4e952f3b48fe95b906ac81a9821f",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核临时 ConfigStore 保存测试，Cookie 为白名单拒绝字段，没有真实应用配置快照。",
+      "reviewed_lines": [
+        25
+      ],
+      "reviewed_rules": [
+        "credential_literal"
+      ]
+    },
+    {
+      "path": "tests/test_config_media.py",
+      "sha256": "a3b19c3ee8670779406011e2b35cc1a3cd7d7d45e0cd73b600253cca9d08da9c",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核嵌套媒体和来源 URL 使用 cdn.test/page.test，签名用于确认计划解析不改写参数。",
+      "reviewed_lines": [
+        12,
+        13
+      ],
+      "reviewed_rules": [
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_curl_parser.py",
+      "sha256": "d34abc52457d025bef5dadf393248b172fc89ae7497adbbafe02a85ed96e9fec",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 cURL 字面值全部为 example.com/.example 与短合成参数，伪 Cookie/Authorization 用于解析、CRLF 拒绝和错误脱敏。",
+      "reviewed_lines": [
+        11,
+        46,
+        50,
+        96,
+        155,
+        163,
+        167,
+        209,
+        302,
+        405,
+        408,
+        417,
+        449
+      ],
+      "reviewed_rules": [
+        "credential_header_literal",
+        "credential_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_dash_discovery.py",
+      "sha256": "7487960f5ceda9f11a30d681113f9b72f4acee9305f19caf442c989fd1534400",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 DASH JSON 自行构造于 example 域，主备地址、签名和伪头用于验证视频音频配对与继承。",
+      "reviewed_lines": [
+        27,
+        28,
+        45,
+        47,
+        48
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_dash_download.py",
+      "sha256": "276422bd7e633b64d6d2e60a0056a7b0bc0b32ad7a9e2867cec2bf4fcea5cead",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核实际请求指向本地测试 HTTPServer，合成请求头及签名用于验证既有 DASH 两轨下载上下文。",
+      "reviewed_lines": [
+        51,
+        52,
+        54,
+        85,
+        86
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_dash_json.py",
+      "sha256": "1e436ef27cf8f4e5ef8b615f7e52a46ea660bbb98fe29fa55fb88c1174c22039",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核所有 DASH 轨和签名来自函数内 .test 固定值；URL 用户信息是非法地址拒绝用例。",
+      "reviewed_lines": [
+        19,
+        20,
+        27,
+        55,
+        62,
+        97,
+        106,
+        202
+      ],
+      "reviewed_rules": [
+        "sensitive_url_literal",
+        "url_credentials"
+      ]
+    },
+    {
+      "path": "tests/test_data_migration.py",
+      "sha256": "de5b84a06fa3492211517ea67b79b7f0c3d72744ac8eb20b3203c36ea88ebc59",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核源旧版数据全部在临时目录现场创建，Cookie 是应被拒绝导入的合成配置字段。",
+      "reviewed_lines": [
+        85
+      ],
+      "reviewed_rules": [
+        "credential_literal"
+      ]
+    },
+    {
+      "path": "tests/test_discovery_context.py",
+      "sha256": "1059b9c29cdb3b678f6dd446fd182dd09e37b354ddde3ec1ba60070a5dd82849",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核媒体 URL 使用 media.test/c.test，伪 Cookie/Bearer 和 body 用于上下文哈希、重定向及错误脱敏。",
+      "reviewed_lines": [
+        22,
+        24,
+        27,
+        57,
+        80,
+        86
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_download_queue.py",
+      "sha256": "b1011835f54713bb087d4c7e2aa0be28068e2c2fd98212a03dcacae93e843e85",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核队列 RequestContext 和 worker 替身，example/.test 请求头与伪签名用于隔离、重试及日志清理断言。",
+      "reviewed_lines": [
+        119,
+        272,
+        303,
+        312,
+        378,
+        402,
+        403,
+        405,
+        406,
+        410,
+        415,
+        571
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_downloader.py",
+      "sha256": "d553771985e4207ed48719a97f8f4391e0739af63b80291b1094eb0e5308d5e8",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 example.com 下载参数构造，token 与请求头为短合成值，用于子进程参数和上下文保持。",
+      "reviewed_lines": [
+        9,
+        14,
+        95
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_hosted_release.py",
+      "sha256": "79c2df96976f736a73003c33755d0727dee1af5d5b5b199e6616b52185b65816",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 localhost TLS 服务器与临时测试资产；用户名、密码、token 为故意构造的异常输入，用于验证报告不泄漏。",
+      "reviewed_lines": [
+        49,
+        173,
+        244
+      ],
+      "reviewed_rules": [
+        "sensitive_url_literal",
+        "url_credentials"
+      ]
+    },
+    {
+      "path": "tests/test_http_client.py",
+      "sha256": "16d48e0aa5e2ff53e71e56789ab90a0d2e1fa82613ce274bc86aa9fa977015fc",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 HTTPHandler 为本地服务器，重定向、Cookie/Bearer 与签名均测试代码自行生成。",
+      "reviewed_lines": [
+        32,
+        56,
+        58,
+        62,
+        69,
+        70,
+        73,
+        83,
+        95
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_library_tracks.py",
+      "sha256": "7ef536ca2e0e74634d4298c896187dd527e5b99497439da665432872800cb4ef",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 ffmpeg 解码失败文本为模拟返回值，private.test URL 用于确认错误摘要不会泄漏原始文本。",
+      "reviewed_lines": [
+        83
+      ],
+      "reviewed_rules": [
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_library_validation.py",
+      "sha256": "d1218df2a8d72e4a32bf8e8c853a6cc15d6a9245e128d195b1b5ee87892694ba",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 example.test URL 与损坏文件的模拟错误均测试输入，验证不会网络读取及不显示签名。",
+      "reviewed_lines": [
+        50,
+        166
+      ],
+      "reviewed_rules": [
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_live_release_check.py",
+      "sha256": "5bbc6208b931114333c074912c1e331a778d65e4a26666f81cc97bac038ec6a3",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 rou.video 地址的 token 仅是被拒绝的 override 示例；其他 example 域及异常文本用于统计与脱敏断言。",
+      "reviewed_lines": [
+        77,
+        122,
+        149,
+        257,
+        313
+      ],
+      "reviewed_rules": [
+        "credential_header_literal",
+        "sensitive_url_literal",
+        "url_credentials"
+      ]
+    },
+    {
+      "path": "tests/test_manifests.py",
+      "sha256": "471759bb91151acad2711fa32a79508b5609dfc9dec58e755f181eb15295573f",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 HLS/XML 全部以函数内字符串构造，签名和值使用 example 域及相对资源名，测试解析和不泄漏证据。",
+      "reviewed_lines": [
+        12,
+        262,
+        263,
+        266,
+        297,
+        300,
+        504,
+        505,
+        511,
+        512
+      ],
+      "reviewed_rules": [
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_media_cards_ui.py",
+      "sha256": "5d0a40606d53d923f9b8ce554825a45e6f4bca76ac95f5a479da12b89e7fa773",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核媒体卡片理由及标题注入 unit 合成字段，目的是 tooltip/显示文本不得泄漏凭据。",
+      "reviewed_lines": [
+        66,
+        68,
+        71
+      ],
+      "reviewed_rules": [
+        "credential_header_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_media_chain_diagnostics.py",
+      "sha256": "7d10268ed11891df4e6e0db7e9b25e4ab3bc6c24b3c02aaed75d8bc84bceb50b",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核网络事件由辅助方法构造于 example.test/cdn.test，伪凭据与签名用于诊断脱敏和 DASH 分类。",
+      "reviewed_lines": [
+        16,
+        19,
+        21,
+        30,
+        36,
+        37,
+        81,
+        118
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "sensitive_url_literal",
+        "url_credentials"
+      ]
+    },
+    {
+      "path": "tests/test_media_confidence.py",
+      "sha256": "d80cab2348e104b9bbad8d5141edd6a84007ac27e22a614057bff6d5a4f75e60",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核合成候选和请求头用于验证评分解释无敏感字段，URL 使用 example 域，未使用真实捕获内容。",
+      "reviewed_lines": [
+        234,
+        288,
+        289,
+        290,
+        291,
+        297
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_media_details.py",
+      "sha256": "655b84bc0baa8bdf82f88980ab0d871999bd8347534e619e390675c9b28bd5a8",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 media.example RequestContext 和 fixture 签名只是验证候选详情不改变既有下载载荷。",
+      "reviewed_lines": [
+        371
+      ],
+      "reviewed_rules": [
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_media_details_ui.py",
+      "sha256": "4d2cf8fd0f1de2a6b22a7c130bbb2406933a227a8480240ddf730ce0afb14583",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 example 域和 unit 伪 Cookie/签名，断言详情和可信度理由 tooltip 被脱敏。",
+      "reviewed_lines": [
+        93,
+        167,
+        168
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_media_discovery.py",
+      "sha256": "ee08576573085534c091585efc2557a6141ae4a2e085ff23c251a09a6d73fcdf",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 HLS、DOM/CDP 和 HTTP 响应均由单测构造；example 域伪 Cookie/Bearer/签名验证上下文、去重及脱敏。",
+      "reviewed_lines": [
+        14,
+        96,
+        150,
+        152,
+        160,
+        168,
+        169,
+        178,
+        248,
+        302,
+        303,
+        304,
+        308,
+        313,
+        317,
+        318,
+        326,
+        343,
+        344,
+        350,
+        356,
+        365,
+        463,
+        465,
+        555,
+        606,
+        614,
+        615,
+        640
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_media_groups.py",
+      "sha256": "59fda480b29e823eeb4667a9be14d82d3920d2468efada2d2da6f931e7231e67",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核所有分组候选来自 example 域及短合成签名，验证刷新身份、上下文和来源隔离，不是已登录媒体地址。",
+      "reviewed_lines": [
+        56,
+        58,
+        60,
+        66,
+        162,
+        167,
+        179,
+        181,
+        188,
+        189,
+        190,
+        196,
+        199,
+        304,
+        305,
+        309,
+        319,
+        326,
+        331
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_media_guard.py",
+      "sha256": "ee8ca8fabec201871a2f3d21eaa307e08da62b0f2215bd5f2e19f13103e821ab",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 HLS 与 key URI 是内存构造的 x 测试域，URL 用户信息为拒绝用例，不是真实密钥。",
+      "reviewed_lines": [
+        25,
+        34,
+        35,
+        48
+      ],
+      "reviewed_rules": [
+        "sensitive_url_literal",
+        "url_credentials"
+      ]
+    },
+    {
+      "path": "tests/test_media_history.py",
+      "sha256": "bd781304ad18e2846d13e0dda37159f888f72fb082b2079386f5859e93fed6f4",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 Example/.test 与 Douyin 公开页被添加明示假 token，伪 Cookie/Bearer/body 用于证明敏感上下文不入数据库或报告。",
+      "reviewed_lines": [
+        41,
+        107,
+        108,
+        109,
+        118,
+        123,
+        126,
+        128,
+        129,
+        155,
+        156,
+        170,
+        329,
+        332
+      ],
+      "reviewed_rules": [
+        "credential_header_literal",
+        "credential_literal",
+        "sensitive_url_literal",
+        "url_credentials"
+      ]
+    },
+    {
+      "path": "tests/test_media_quality.py",
+      "sha256": "bb63a8896c402473704422a0a74b2e20c18689f83284503eeeb2950ce7da6f52",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 douyinvod 地址为 带合成签名参数的 opaque 路径 合成占位候选，example 请求用于保持质量选择的上下文载荷。",
+      "reviewed_lines": [
+        340,
+        378
+      ],
+      "reviewed_rules": [
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_media_quality_ui.py",
+      "sha256": "d3305b5231e3ab238cd9772720ee8be85985778e90567a58bdcb9580c5078279",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 cdn.example、fixture UA 和 synthetic Bearer，仅验证 DASH 画质选择调用现有入口。",
+      "reviewed_lines": [
+        174,
+        175
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_media_tracks.py",
+      "sha256": "20555a0c3e9abe3b94e276d1d4957098a40d1e2113103e7c6a5d17f8eb196ff4",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 normalize_preferences 被注入 secret Cookie 字段，断言未知凭据字段不会持久化。",
+      "reviewed_lines": [
+        172
+      ],
+      "reviewed_rules": [
+        "credential_literal"
+      ]
+    },
+    {
+      "path": "tests/test_mediaflow_discovery.py",
+      "sha256": "db6bcce117be40bfda6946cff7f6dc7c2fb0c9478a3591f43e7e48e5d0fcc132",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 douyinvod 的 /opaque 地址使用 PRIVATE 与短 A%2FB 假值，未保存真实 CDN 地址；其他候选使用 example 域验证发现与脱敏。",
+      "reviewed_lines": [
+        70,
+        72,
+        249,
+        250,
+        299,
+        406
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_output_organization.py",
+      "sha256": "ab6b96d90b0af74f35bf6b879b16792a99515030d9a6b2d03ebd3995beb02693",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 secret.test URL 只是非法 media_id 测试输入，输出应采用可靠备用名称。",
+      "reviewed_lines": [
+        91
+      ],
+      "reviewed_rules": [
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_output_validator.py",
+      "sha256": "60ad93eb9c3ce0e3855f70a35063842cb756057b23728c4a222724b45ce605ca",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 ffprobe 模拟 JSON 中 tags、codec_long_name 和错误文本为故意注入的伪秘密，断言摘要白名单不传播。",
+      "reviewed_lines": [
+        141,
+        242
+      ],
+      "reviewed_rules": [
+        "credential_header_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_progressive_mp4.py",
+      "sha256": "a53e9664ad5775e9e33855976b0221905223089d6787c1e5c126e984033756d1",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 MP4 网络观测由函数构造于 example 域，Cookie 固定假值，用于 Range 与完整资源关联。",
+      "reviewed_lines": [
+        26
+      ],
+      "reviewed_rules": [
+        "credential_literal"
+      ]
+    },
+    {
+      "path": "tests/test_public_source_audit.py",
+      "sha256": "5500aa041378aec500f122ad9719d5645edebeaad5bed95e36cecc8f1a1c400a",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核本文件现场构造无效凭据形态、私钥标记和个人路径负例；完整私钥形态由无密码学意义的字符串在临时目录组合。",
+      "reviewed_lines": [
+        45,
+        56,
+        58,
+        79,
+        149,
+        156,
+        186
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "private_key_generation"
+      ]
+    },
+    {
+      "path": "tests/test_publish_release.py",
+      "sha256": "b89558b4407782600e5ff597912539dd7dfa5b76322a78e825ddfeafb8d1c211",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 Ed25519 测试私钥运行时随机生成并加密存于 TemporaryDirectory，密码明确 unit-only；PEM 标记仅用于格式断言。",
+      "reviewed_lines": [
+        34,
+        35,
+        38,
+        119,
+        133,
+        155
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "private_key_generation",
+        "private_key_marker"
+      ]
+    },
+    {
+      "path": "tests/test_recovery_acceptance.py",
+      "sha256": "ee27fb1a543bf4ace5973914232873f608a11b3d257072f5fb32f37f34bc380f",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 127.0.0.1 固定夹具的非法路径/用户信息/签名拒绝用例，不连接外站或使用恢复凭据。",
+      "reviewed_lines": [
+        36,
+        37,
+        167
+      ],
+      "reviewed_rules": [
+        "sensitive_url_literal",
+        "url_credentials"
+      ]
+    },
+    {
+      "path": "tests/test_recovery_http.py",
+      "sha256": "f30baa20ab1c15987a9ea26eae230027492bbbc85616e84473e43ec960903067",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 media.example 的合成过期签名上下文，用于要求真实失效证据的失败恢复判断。",
+      "reviewed_lines": [
+        190
+      ],
+      "reviewed_rules": [
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_recovery_workspace.py",
+      "sha256": "a350332ee281133cbaf449f0f705555d8bedc14328e450c65e03134dcc708373",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 cdn.test RequestContext 与伪 Cookie 构造于 setUp，工作目录为临时断点夹具。",
+      "reviewed_lines": [
+        218,
+        219
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_release_structure.py",
+      "sha256": "c3f5d070fa72b5c2064fad4892cf320edf1ace71e06fb52084c491da17baf36d",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核发布包安全检查的故意私钥标记与 Cookie 文本均构造于临时负例文件，不含有效私钥或用户数据。 主代理复核新版本路径改为 APP_VERSION 或结构门禁异常契约修正，原有合成测试来源不变。",
+      "reviewed_lines": [
+        129,
+        130
+      ],
+      "reviewed_rules": [
+        "credential_header_literal",
+        "private_key_marker"
+      ]
+    },
+    {
+      "path": "tests/test_release_workflow.py",
+      "sha256": "5d2a08d922cf47a487cb49b8b5739f225deb672574b566e21bd0623f8575c792",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 Ed25519 测试密钥与随机密码现场生成，临时文件仅用于 ACL、加密和正式密钥不匹配负例；不使用生产私钥。",
+      "reviewed_lines": [
+        44,
+        57,
+        93,
+        99,
+        101,
+        187
+      ],
+      "reviewed_rules": [
+        "private_key_generation",
+        "private_key_marker"
+      ]
+    },
+    {
+      "path": "tests/test_request_context.py",
+      "sha256": "da9729874518d72951c7b81ce64ad1feac02a4800515bddb98c9f36e4caaff88",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 origin.test/cdn.test/example 合成签名和请求头，测试 URL 字节保持、跨域清理及脱敏。",
+      "reviewed_lines": [
+        9,
+        11,
+        18,
+        30,
+        33,
+        100,
+        151,
+        152,
+        158,
+        166,
+        169,
+        173,
+        176
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_request_input.py",
+      "sha256": "3f72f341fb91741089952d58528ebd39dccb450415c6eaa0542f7b4e6dd4243f",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 example.com/.example cURL、JSON 和带用户信息的拒绝样例，fixture 伪 Cookie 不是浏览器导出。",
+      "reviewed_lines": [
+        12,
+        115,
+        207,
+        376,
+        377,
+        472,
+        549
+      ],
+      "reviewed_rules": [
+        "credential_header_literal",
+        "sensitive_url_literal",
+        "url_credentials"
+      ]
+    },
+    {
+      "path": "tests/test_resume_identity.py",
+      "sha256": "e33837ccb0913af1722b2f22d43c7fcca3716d07762f8d0d68962b91d06420d4",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 cdn.test/fresh-cdn.test 的短合成签名，测试恢复身份布局与地址刷新边界。",
+      "reviewed_lines": [
+        11,
+        21,
+        26,
+        36,
+        37,
+        42
+      ],
+      "reviewed_rules": [
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_rou_current_protocol.py",
+      "sha256": "7160b95d1c9a3434f4e9f1f0bdfeafde4fb514acb74d873de31f7dd9de4c9aaf",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 example 域伪 Cookie/Bearer/签名与非法 Location，断言当前协议诊断脱敏及拒绝行为。",
+      "reviewed_lines": [
+        167,
+        231
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "url_credentials"
+      ]
+    },
+    {
+      "path": "tests/test_rou_current_ui.py",
+      "sha256": "1a7faade0000b607a100898b48637b5ab4f75462bba9886bee6ac41a6d448e89",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 UI 模拟候选中 private/secret/synthetic 固定假值，验证内嵌浏览器请求保持和 trace 脱敏。",
+      "reviewed_lines": [
+        44,
+        326,
+        328,
+        334
+      ],
+      "reviewed_rules": [
+        "credential_literal"
+      ]
+    },
+    {
+      "path": "tests/test_rou_runtime_regressions.py",
+      "sha256": "18c054709ac04ebb755ab842064bf702c12a2676d61594b0da36726e105c0c95",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 page.example 及运行时模拟请求内的伪 Cookie，用于同源授权及跨源退出行为，不含真实站点凭据。",
+      "reviewed_lines": [
+        94,
+        101
+      ],
+      "reviewed_rules": [
+        "credential_literal"
+      ]
+    },
+    {
+      "path": "tests/test_security.py",
+      "sha256": "b784e9ba717e2976d76498d84fde6e3dfe27ef955c37a8f051f297aa21270b20",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核配置白名单及 Redactor 单测使用人工构造的伪 Cookie/Bearer/example URL 与临时 legacy 文件。 主代理复核新版本路径改为 APP_VERSION 或结构门禁异常契约修正，原有合成测试来源不变。",
+      "reviewed_lines": [
+        18,
+        24,
+        39,
+        69
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_site_resolvers.py",
+      "sha256": "8cc577426d06229bede58c26b838d806bf5d71a5bf8b453b3e237741aae6e032",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 cdn.test 的合成签名与 private 请求头，用于资源解析、继承和诊断脱敏。",
+      "reviewed_lines": [
+        16,
+        82,
+        138,
+        172
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_storage_cleanup.py",
+      "sha256": "fd73ca53710ded77eeaa59e5bc7dd07b9978feee212e9c6836d21d13cc4dc347",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 example.test 的伪签名和临时真实 TaskStore，验证清理保护读取安全元数据，不解密用户凭据。",
+      "reviewed_lines": [
+        154
+      ],
+      "reviewed_rules": [
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_task_recovery.py",
+      "sha256": "b53219075c52d3705d9bb9fbf2fbdab58030b8375bb2359bffe395ec03e1ece9",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 media.example 伪秘密与临时 DPAPI 状态，用于当前用户加密往返和解密失败处理，没有原用户任务快照。",
+      "reviewed_lines": [
+        58,
+        59,
+        128,
+        145
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_thumbnails.py",
+      "sha256": "df01d0dacf93eade7bd3374f454f5864f9763f916b220a6ee7b810b8009d02b3",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 secret.invalid 的签名 URL 是拒绝验证结果中的非法 output_path，不访问真实媒体。",
+      "reviewed_lines": [
+        133
+      ],
+      "reviewed_rules": [
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_ui.py",
+      "sha256": "00be06b142b2f54cb58f88b367a4ca460b1c13ca533484a6a888ba68e42e7ef3",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核所有 cURL、请求头和签名来自 example 域或 x 测试域的短假值，验证显示、日志导出及并发隔离。",
+      "reviewed_lines": [
+        91,
+        93,
+        122,
+        128,
+        134,
+        164,
+        206,
+        207,
+        241,
+        305,
+        307,
+        312,
+        325,
+        331,
+        334
+      ],
+      "reviewed_rules": [
+        "credential_header_literal",
+        "credential_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_update_channel.py",
+      "sha256": "06d2b778211fdbe39fd0aa48089d88f71e706de21c0c109758958565fda51a6d",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核公钥由每次测试运行现场随机生成，只作为独立信任根、替换拒绝和指纹校验测试，不写入生产配置。 主代理复核新版本路径改为 APP_VERSION 或结构门禁异常契约修正，原有合成测试来源不变。",
+      "reviewed_lines": [
+        25
+      ],
+      "reviewed_rules": [
+        "private_key_generation"
+      ]
+    },
+    {
+      "path": "tests/test_update_ed25519.py",
+      "sha256": "d8067c217387d3e790b4db76c4a9cf225a7d173e8f8e9d48d563968d566893cb",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核测试 Ed25519 私钥和错误公钥均在测试 setUp 内随机生成，仅用于验签及篡改拒绝。",
+      "reviewed_lines": [
+        15,
+        76
+      ],
+      "reviewed_rules": [
+        "private_key_generation"
+      ]
+    },
+    {
+      "path": "tests/test_update_health.py",
+      "sha256": "98cd7de1bda7d8a34be324af8b839e9145e03317f83472a704ebc8c9fbf00a3d",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 example.test 伪任务上下文和测试 Cookie，用于验证健康检查仅访问独立测试数据。",
+      "reviewed_lines": [
+        72,
+        74
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_update_manifest.py",
+      "sha256": "6273ea4138f920ea57e27dfd6c980812972627044a870c29fc2d647f090e2b05",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 example.invalid 中含用户信息的 HTTPS 地址为清单 URL 格式拒绝测试，不是更新源凭据。",
+      "reviewed_lines": [
+        180
+      ],
+      "reviewed_rules": [
+        "url_credentials"
+      ]
+    },
+    {
+      "path": "tests/test_url_policy.py",
+      "sha256": "74d7ac90ad078440da69f0253cd4b1ab74221efc2b5b600998f88634cb49d7eb",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 cdn.test 与相对 URI 的短合成参数，用于标准解析和 rou 作用域继承规则。",
+      "reviewed_lines": [
+        8,
+        12,
+        16,
+        20,
+        25,
+        28,
+        29,
+        30
+      ],
+      "reviewed_rules": [
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_webview2_browser.py",
+      "sha256": "a3f6db7647fed80f906c9963c573f92d142f9d3852cdda4a4a050b0af6859f3e",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核 CDP/worker 协议消息由代码模拟，所有 Cookie/Bearer 标有 synthetic/unit 或固定假值，URL 为 example 域。",
+      "reviewed_lines": [
+        65,
+        71,
+        80,
+        81,
+        114,
+        118,
+        167,
+        201,
+        251,
+        390,
+        395
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/webview2_smoke.py",
+      "sha256": "899ac8303a850e0c93120fdbccd02840f996048a0bb31502136feb3b5016e639",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核测试 JavaScript 在本地页面设置 fixture Cookie，仅检查 WebView2 持久化，不读取其他浏览器配置。",
+      "reviewed_lines": [
+        130
+      ],
+      "reviewed_rules": [
+        "credential_literal"
+      ]
+    }
+  ]
+}
