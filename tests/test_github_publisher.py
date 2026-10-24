@@ -20,6 +20,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from core.update_manifest import REQUIRED_FILES, UpdateValidationError, canonical_bytes
 from scripts import publish_github_release as publisher
+from scripts.accept_release_transaction import load_resume
 
 
 class SyntheticGitHub:
@@ -51,6 +52,7 @@ class SyntheticGitHub:
             if self.current is not None:
                 raise AssertionError('A fixture release must never be replaced.')
             self.current = self.draft()
+            self.current['prerelease'] = '--prerelease' in command
             value = ''
         elif command[:2] == ['release', 'upload']:
             path = Path(command[3])
@@ -75,6 +77,7 @@ class SyntheticGitHub:
             if self.fail_publish:
                 return subprocess.CompletedProcess(arguments, 1, '', 'unit-sensitive-diagnostic')
             self.current.update(draft=False, published_at='2026-10-23T09:00:00Z',
+                prerelease='--prerelease' in command,
                 html_url='https://github.com/' + self.repository + '/releases/tag/' + self.tag)
             for asset in self.current['assets']:
                 asset['browser_download_url'] = ('https://github.com/' + self.repository
@@ -147,6 +150,22 @@ class GitHubPublisherTests(unittest.TestCase):
 
     def recorded(self):
         return json.loads(self.report.read_text(encoding='utf-8'))
+
+    def mirror_server(self):
+        return SyntheticGitHub(self.artifacts, 'publisher-unit/MediaFlow-Release-Acceptance',
+            'mediaflow-pipeline-test-unit-only')
+
+    def invoke_test(self, server, *, repository=None, tag=None, expected_version='2.1.0', create_only=False):
+        self.report = self.directory / 'test-publication.json'
+        channel = deepcopy(self.channel)
+        channel['source_url'] = 'https://github.com/' + self.repository + '/releases/latest/download/manifest.json'
+        args = argparse.Namespace(repository=repository or server.repository, gh=str(self.gh),
+            artifacts=str(self.artifacts), asset=[], notes=str(self.notes), report=str(self.report),
+            publish=not create_only, test_release=True, test_tag=tag or server.tag, expected_version=expected_version,
+            test_create_only=create_only)
+        with patch.object(publisher, 'load_channel', return_value=channel), \
+                patch.object(publisher.subprocess, 'run', side_effect=server):
+            return publisher.publish(args)
 
     def test_publication_refreshes_all_final_urls_and_never_claims_anonymous_acceptance(self):
         server = self.server()
@@ -289,6 +308,117 @@ class GitHubPublisherTests(unittest.TestCase):
             self.invoke(server)
         self.assertEqual(report.read_bytes(), b'Existing evidence must remain byte-for-byte intact.')
         self.assertEqual(server.commands, [])
+
+    def test_isolated_mirror_keeps_formal_content_and_uses_prerelease_never_latest(self):
+        server = self.mirror_server()
+        before = (self.artifacts / 'release.json').read_bytes()
+        result = self.invoke_test(server)
+        self.assertTrue(result['passed'])
+        self.assertTrue(result['test_release'])
+        self.assertTrue(result['published_assets_verified'])
+        self.assertEqual(result['formal_content_repository'], self.repository)
+        self.assertEqual((self.artifacts / 'release.json').read_bytes(), before)
+        self.assertTrue(server.current['prerelease'])
+        self.assertFalse(result['production_chain_verified'])
+        self.assertFalse(result['public_online_verified'])
+        self.assertFalse(result['mirror_public_verified'])
+        writes = [c for c in server.commands if c[0] == 'release' and c[1] in ('create','edit')]
+        self.assertEqual(len(writes), 2)
+        for command in writes:
+            self.assertIn('--prerelease', command)
+            self.assertIn('--latest=false', command)
+            self.assertNotIn('--latest', command)
+            self.assertEqual(command[command.index('--repo')+1], server.repository)
+        self.assertTrue(all('/'+server.tag+'/' in a['url'] for a in result['assets']))
+
+    def test_test_release_cannot_target_formal_or_other_repository(self):
+        for repository in (self.repository, 'publisher-unit/unrelated-project',
+                'other-owner/MediaFlow-Release-Acceptance'):
+            with self.subTest(repository=repository):
+                server = self.mirror_server()
+                with self.assertRaisesRegex(publisher.PublicationError, 'separate owner'):
+                    self.invoke_test(server, repository=repository)
+                self.assertEqual(server.commands, [])
+
+    def test_test_tag_is_bounded_and_cannot_be_a_product_version(self):
+        for tag in ('v2.1.0','latest','mediaflow-pipeline-test-../stable','mediaflow-pipeline-test-'+('x'*92)):
+            with self.subTest(tag=tag):
+                server = self.mirror_server()
+                with self.assertRaisesRegex(publisher.PublicationError, 'bounded'):
+                    self.invoke_test(server, tag=tag)
+                self.assertEqual(server.commands, [])
+
+    def test_test_version_and_signature_are_verified_before_any_github_call(self):
+        server = self.mirror_server()
+        with self.assertRaisesRegex(publisher.PublicationError, 'Requested test version'):
+            self.invoke_test(server, expected_version='2.1.1')
+        self.assertEqual(server.commands, [])
+        changed = dict(self.manifest, release_notes='Tampered signed field')
+        self.write_json(self.artifacts / 'release.json', changed)
+        with self.assertRaises(UpdateValidationError):
+            self.invoke_test(server)
+        self.assertEqual(server.commands, [])
+
+    def test_test_mode_never_promotes_an_existing_non_prerelease_draft(self):
+        server = self.mirror_server()
+        server.current = server.draft()
+        before = deepcopy(server.current)
+        with self.assertRaisesRegex(publisher.PublicationError, 'prerelease state'):
+            self.invoke_test(server)
+        self.assertEqual(server.current, before)
+        self.assertFalse(any(c[0] == 'release' for c in server.commands))
+
+    def test_test_published_repeat_is_read_only_refusal(self):
+        server = self.mirror_server()
+        server.current = dict(server.draft(), draft=False, prerelease=True,
+            published_at='2026-10-24T00:00:00Z')
+        before = deepcopy(server.current)
+        with self.assertRaisesRegex(publisher.PublicationError, 'already published'):
+            self.invoke_test(server)
+        self.assertEqual(server.current, before)
+        self.assertFalse(any(c[0] == 'release' for c in server.commands))
+
+    def test_test_tag_does_not_override_a_production_call(self):
+        args = argparse.Namespace(artifacts=str(self.artifacts), repository=self.repository,
+            asset=[],test_tag='mediaflow-pipeline-test-no-mode')
+        with self.assertRaisesRegex(publisher.PublicationError, 'explicit TestRelease'):
+            publisher.publication_inputs(args)
+
+    def test_isolated_create_only_is_an_empty_unverified_draft(self):
+        server = self.mirror_server()
+        result = self.invoke_test(server, create_only=True)
+        self.assertTrue(result['passed'])
+        self.assertEqual(result['stage'],'isolated_test_draft_created_no_upload')
+        self.assertFalse(result['draft_verified'])
+        self.assertFalse(result['published'])
+        self.assertFalse(result['publication_requested'])
+        self.assertEqual(server.current['assets'],[])
+        self.assertFalse(any(c[:2] in (['release','upload'],['release','edit']) for c in server.commands))
+
+    def test_create_only_cannot_bypass_production_or_request_publication(self):
+        for testing,publishing in ((False,False),(True,True)):
+            with self.subTest(testing=testing,publishing=publishing):
+                args=argparse.Namespace(test_release=testing,test_create_only=True,publish=publishing)
+                with self.assertRaisesRegex(publisher.PublicationError,'non-publishing TestRelease'):
+                    publisher.publication_inputs(args)
+
+    def test_published_read_checkpoint_requires_exact_repository_and_failed_phase(self):
+        valid = {'schema_version':1,'scope':'real_github_isolated_publication_transaction',
+            'repository':'publisher-unit/MediaFlow-Release-Acceptance','passed':False,
+            'stage':'anonymous-public-download-signature-and-zip-verification',
+            'faults':{'partial_assets':{'passed':True},'publication_failure':{'passed':True}},
+            'release_id':123,'test_release_url':'https://github.com/publisher-unit/fixture'}
+        path = self.directory/'unit-checkpoint.json'
+        self.write_json(path,valid)
+        before = path.read_bytes()
+        self.assertEqual(load_resume(path,valid['repository']),valid)
+        self.assertEqual(path.read_bytes(),before)
+        for change in ({'passed':True},{'stage':'upload'},{'scope':'unit_process_fixture'},
+                {'release_id':None},{'faults':{}},{'repository':'publisher-unit/MediaFlow-Releases'}):
+            with self.subTest(change=change):
+                self.write_json(path,dict(valid,**change))
+                with self.assertRaisesRegex(publisher.PublicationError,'checkpoint can resume'):
+                    load_resume(path,valid['repository'])
 
 
 if __name__ == '__main__':

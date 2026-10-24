@@ -51,3 +51,29 @@ pwsh -NoProfile -File scripts/release_mediaflow.ps1 -Version <当前版本> -Pub
 ## 许可与发布材料
 
 完整应用 ZIP 包含工具、许可和必需运行资源；额外第三方源码材料按现有 [THIRD_PARTY_SOURCES.md](THIRD_PARTY_SOURCES.md) 提供。Ed25519 只认证更新发布身份，不等于 Windows Authenticode。密钥和签名规范见 [PRODUCTION_RELEASE.md](../PRODUCTION_RELEASE.md)。正式验证记录与本次演练报告分开保存。
+
+## 隔离的真实发布事务
+
+`-TestRelease` 是独立参数集，不能与 `-DryRun` 或 `-Publish` 同用。它只镜像既有正式签名资产，不构建、不重新签名、不创建源码仓库的版本标签。目标严格限定为正式渠道所有者的 `MediaFlow-Release-Acceptance` 仓库，且必须与正式渠道仓库不同。目标必须公开、属于实际登录者并具有管理员权限；标签必须以 `mediaflow-pipeline-test-` 开头。
+
+```powershell
+pwsh -NoProfile -File scripts/release_mediaflow.ps1 -Version 2.1.0 -TestRelease `
+  -TestRepository xlxs123/MediaFlow-Release-Acceptance `
+  -TestTag mediaflow-pipeline-test-<唯一标识> `
+  -SignedArtifactsDirectory <既有正式签名资产目录> `
+  -Gh <已安装的gh.exe> -RunDirectory <新的本地报告目录>
+```
+
+创建和发布都显式使用 `--prerelease --latest=false`（[GitHub CLI 发布参数](https://cli.github.com/manual/gh_release_create)、[编辑参数](https://cli.github.com/manual/gh_release_edit)）。正式生产分支的仓库、版本、标签、签名、资产哈希及已有版本保护保持原有检查。
+
+清单及签名逐字节保持原样，签名包地址仍指向正式资产；镜像地址另在报告中记录，不伪装成已签名的包地址。TestRelease 不修改客户端公钥、更新源或 CDN 信任策略。公开镜像下载验证只标记 `mirror_public_verified`，不把它升级为 `production_chain_verified` 或实际客户端部署验收。
+
+加 `-TestDraftOnly` 可在认证重新下载、验签及哈希检查后保留草稿。后续使用相同 `TestTag` 和新的 `RunDirectory`，自动识别已有草稿、复用一致的资产，只上传缺失项；不要对测试入口使用生产流程的 `-Resume`。已公开的测试 Release 重复执行会安全拒绝。远程同名资产大小、哈希或完成状态不符时也拒绝，保留现场，不执行覆盖或删除。报告中的 `uploaded_assets` 是处理数量，包括复用项；实际新增数量须用远程资产 ID 差集判断。
+
+`-TestCreateOnly` 只完成本地正式内容检查、认证及空预发布草稿创建，便于设置真实故障检查点。它不上传、不发布，`draft_verified` 仍为 `false`，不会伪装成已验证发布包。该选项在生产模式下直接拒绝。创建后回读会有限重试，以处理实测中的草稿可见性延迟；不接受错误的标签、模式或资产状态。
+
+完整真实故障验收入口为 `scripts/accept_release_transaction.py`，参数 `--version`、`--repository`、`--artifacts`、`--gh`、`--pwsh`、`--output` 均须明确提供。只有显式 `--create-repository` 才可在不存在时创建上述专用公开仓库。它实际测试标签与草稿创建、部分资产恢复、被服务器拒绝的发布请求、公开预发布、匿名下载、重复执行、HTTPS 上传中断、远程冲突及已签名字段篡改。中断后服务器可能保留无摘要残片，此时验收要求安全停止而非强行续传。所有远程测试记录和本地报告均保留。
+
+`--tag-prefix` 可以在新的本地报告目录中继续已有空草稿或仅完成一个包上传的草稿；更晚阶段失败请依据原报告和同一标签使用 TestRelease 单步恢复，不覆盖旧证据。首次实测发现按标签查询未返回认证草稿，验收辅助程序因此复用发布器的 Release 列表查询。
+
+若已经发布测试预发布、在支持的后续验收阶段失败，可以向验收入口传入 `--resume-from <原report.json>` 和新的 `--output`。入口重新核对原稳定快照、正式签名包身份、原 Release ID 和全部公开资产；一致后跳过创建、上传和发布。匿名验证未完成时重新执行；已经完成时对保留的实际下载逐项重新计算哈希并再验签，复用原始报告，避免重复下载。已完成的上传中断案例也会核对真实远程资产 ID 与摘要后复用。原报告、部分下载及失败草稿均保留，完成过的报告不可作为失败检查点重入。

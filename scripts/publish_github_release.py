@@ -13,12 +13,14 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 import uuid
 from urllib.parse import unquote, urlsplit
 
 ROOT=Path(__file__).resolve().parents[1]
 if __package__ in ('',None): sys.path.insert(0,str(ROOT))
 from core.update_channel import load_channel
+from core.update_github import release_asset
 from core.update_manifest import validate_manifest, canonical_bytes, parse_version
 from core.data_migration import frozen_file
 from scripts.publish_release import _read_document, _save_new
@@ -111,23 +113,55 @@ def verified_asset_urls(current,records,repository,tag,*,published=False):
     return urls
 
 
-def publish(args):
+def publication_inputs(args):
+    """Keep formal content validation separate from an explicit test mirror."""
+    testing=getattr(args,'test_release',False)
+    test_tag=getattr(args,'test_tag','')
+    create_only=getattr(args,'test_create_only',False)
+    if create_only and (not testing or args.publish):
+        raise PublicationError('Create-only checkpoint is limited to explicit non-publishing TestRelease mode.')
+    if test_tag and not testing:
+        raise PublicationError('A test tag is only allowed in explicit TestRelease mode.')
+    if not testing:
+        return (*prepare_assets(args.artifacts,args.repository,args.asset),None)
+    source_url=load_channel().get('source_url','')
+    channel=release_asset(source_url)
+    if not channel:
+        raise PublicationError('TestRelease requires an initialized, real GitHub stable channel.')
+    formal='/'.join(urlsplit(source_url).path.split('/')[1:3])
+    allowed=channel[0]+'/MediaFlow-Release-Acceptance'
+    if args.repository.casefold()!=allowed.casefold() or args.repository.casefold()==formal.casefold():
+        raise PublicationError('TestRelease may only target the separate owner/MediaFlow-Release-Acceptance repository.')
+    if not re.fullmatch(r'mediaflow-pipeline-test-[a-z0-9][a-z0-9.-]{0,90}',test_tag):
+        raise PublicationError('TestRelease requires an explicit, bounded mediaflow-pipeline-test-* tag.')
+    manifest,_,assets,records=prepare_assets(args.artifacts,formal,args.asset)
+    expected=getattr(args,'expected_version','')
+    if expected and manifest['version']!=expected:
+        raise PublicationError('Requested test version differs from the formally signed content.')
+    return manifest,test_tag,assets,records,formal
+
+
+def publish(args,*,environment=None):
     if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,99}/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}',args.repository):
         raise PublicationError('Repository must be an explicit owner/name.')
     gh=str(Path(args.gh).absolute()) if args.gh else shutil.which('gh')
     if not gh or not Path(gh).is_file():raise PublicationError('A normal installed GitHub CLI is required by this publisher tool.')
-    manifest,tag,assets,records=prepare_assets(args.artifacts,args.repository,args.asset)
+    manifest,tag,assets,records,formal_repository=publication_inputs(args)
+    testing=getattr(args,'test_release',False)
     report_path=Path(args.report).absolute()
     if not report_path.parent.is_dir():raise PublicationError('Report parent must exist outside publication assets.')
     if report_path.exists():raise PublicationError('Use a new report path; previous evidence is preserved.')
     report={'passed':False,'repository':args.repository,'tag':tag,'assets':records,
         'public_online_verified':False,'draft_verified':False,'published':False,
-        'publication_requested':False,'published_assets_verified':False,'stage':'repository_check'}
+        'publication_requested':False,'published_assets_verified':False,'stage':'repository_check',
+        'test_release':testing,'formal_content_repository':formal_repository,
+        'draft_created_by_this_run':False,
+        'mirror_public_verified':False,'production_chain_verified':False}
     def save():report_path.write_text(json.dumps(report,ensure_ascii=False,indent=2),'utf-8')
     def run(*command,json_result=False,timeout=120):
         p=subprocess.run([gh,*map(str,command)],stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,text=True,encoding='utf-8',errors='replace',timeout=timeout,
-            creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+            creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0),env=environment)
         if p.returncode:raise PublicationError('GitHub CLI operation failed; credentials and raw diagnostics were not logged: '+command[0])
         return json.loads(p.stdout) if json_result else p.stdout.strip()
     def release():
@@ -148,11 +182,24 @@ def publish(args):
             raise PublicationError('This version is already published. Existing release/assets were preserved.')
         if not current:
             report['stage']='create_draft';save()
+            flags=['--prerelease','--latest=false'] if testing else []
             run('release','create',tag,'--repo',args.repository,'--target',repo['default_branch'],
-                '--title','MediaFlow '+manifest['version'],'--notes-file',notes,'--draft')
-            current=release()
+                '--title',('MediaFlow transaction TEST ' if testing else 'MediaFlow ')+manifest['version'],
+                '--notes-file',notes,'--draft',*flags)
+            for attempt in range(6):
+                current=release()
+                if current:break
+                if attempt<5:time.sleep(1)
             if not current or not current['draft']:raise PublicationError('Draft creation could not be confirmed.')
+            report['draft_created_by_this_run']=True
+        if current.get('prerelease') is not testing:
+            raise PublicationError('Draft prerelease state differs from the explicit publication mode; preserving it.')
         report.update(release_url=current['html_url'],release_id=current['id'])
+        if getattr(args,'test_create_only',False):
+            if current['assets']:
+                raise PublicationError('Create-only checkpoint requires an empty test draft; existing assets preserved.')
+            report.update(passed=True,stage='isolated_test_draft_created_no_upload')
+            return report
         report['stage']='upload';save()
         existing={r['name']:r for r in current['assets']}
         for path,record in zip(assets,records):
@@ -195,12 +242,13 @@ def publish(args):
         report['draft_verified']=True;save()
         if args.publish:
             report.update(stage='publish',publication_requested=True);save()
-            run('release','edit',tag,'--repo',args.repository,'--draft=false','--latest')
+            flags=['--prerelease','--latest=false'] if testing else ['--latest']
+            run('release','edit',tag,'--repo',args.repository,'--draft=false',*flags)
             report['stage']='public_release_inventory';save()
             current=release()
             expected_url='https://github.com/'+args.repository+'/releases/tag/'+tag
             if (not current or current.get('id')!=report['release_id'] or current.get('tag_name')!=tag
-                    or current.get('draft') is not False or current.get('prerelease') is not False
+                    or current.get('draft') is not False or current.get('prerelease') is not testing
                     or not current.get('published_at') or current.get('html_url')!=expected_url):
                 raise PublicationError('Publication state not confirmed; no public acceptance claimed.')
             report.update(published=True,release_url=current['html_url'])
@@ -211,7 +259,8 @@ def publish(args):
             urls=verified_asset_urls(current,records,args.repository,tag,published=True)
             for item in records:item['url']=urls[item['name']]
             report['published_assets_verified']=True
-        report.update(passed=True,stage='published_pending_anonymous_client_acceptance' if args.publish else 'verified_draft')
+        report.update(passed=True,stage=('test_release_published_pending_anonymous_verification' if testing
+            else 'published_pending_anonymous_client_acceptance') if args.publish else 'verified_draft')
         return report
     except Exception as e:
         report.update(error_type=type(e).__name__,error=str(e) if isinstance(e,PublicationError) else 'Bounded publication operation failed; prior files and draft retained.')
@@ -225,6 +274,9 @@ def main():
     p.add_argument('--artifacts',required=True);p.add_argument('--notes',required=True)
     p.add_argument('--asset',action='append',default=[]);p.add_argument('--report',required=True)
     p.add_argument('--publish',action='store_true',help='Explicitly publish only after authenticated draft re-download verification')
+    p.add_argument('--test-release',action='store_true',help='Only publish an isolated prerelease mirror of existing formal content')
+    p.add_argument('--test-tag',default='');p.add_argument('--expected-version',default='')
+    p.add_argument('--test-create-only',action='store_true',help='Test-only empty draft checkpoint; never uploads or publishes')
     args=p.parse_args()
     try:
         result=publish(args)
