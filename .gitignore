@@ -25,6 +25,7 @@ BrowserProfile/
 downloads/
 userdata/
 .publication/
+.release-runs/
 .third-party-evidence/
 DELIVERY.md
 MODIFIED_FILES.txt

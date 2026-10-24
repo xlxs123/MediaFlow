@@ -16,6 +16,8 @@
 
 ## 构建与发布门禁
 
+统一的 Windows 发布入口是 `scripts/release_mediaflow.ps1`，支持显式 `-DryRun` / `-Publish`、同提交 Windows CI 产物核验、正式保险库签名、草稿发布与实际客户端公网验收。参数、恢复限制和演练证据范围见 [RELEASE_AUTOMATION.md](docs/RELEASE_AUTOMATION.md)。原有 `release_production.ps1` 继续作为兼容的本地准备工具；它本身不创建 Release。
+
 1. 在独立工作区固定经确认的渠道、公钥和版本，不修改旧源码或用户数据。
 2. 执行相关增量测试，构建到新的完整目录。
 3. 实际 EXE 完成本地下载、轨道、媒体库、重启、签名更新、安全部署和回退检查。私人报告不进 Git 或 Release；公开摘要单独脱敏。

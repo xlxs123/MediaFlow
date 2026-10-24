@@ -1482,6 +1482,47 @@
       "reviewed_rules": [
         "private_key_generation"
       ]
+    },
+    {
+      "path": "tests/test_accept_release_update.py",
+      "sha256": "95dc5271076daf73c3fb2d3e89c169e6e35034dabe35ed8c5871a6d6784002bf",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核完整父驱动测试：授权、密码与自定义CA值都是固定的 unit 合成字符串；子进程由受控夹具替代，测试报告明确标记 unit_process_fixture，不使用真实用户凭据或公网下载。",
+      "reviewed_lines": [
+        188
+      ],
+      "reviewed_rules": [
+        "credential_literal"
+      ]
+    },
+    {
+      "path": "tests/test_ci_build_receipt.py",
+      "sha256": "0582b237f7bd0c9d1b45d2aeed67697a90193f479cb01fd2eb941b3144e6bc08",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核完整收据测试：授权文字与 invalid 域用户信息均为故意拒绝的合成输入；测试只在 TemporaryDirectory 创建真实不同字节文件，既不读取保险库也不生成正式签名。",
+      "reviewed_lines": [
+        190,
+        225
+      ],
+      "reviewed_rules": [
+        "credential_literal",
+        "url_credentials"
+      ]
+    },
+    {
+      "path": "tests/test_release_pipeline.py",
+      "sha256": "64e9473684ba8aa34a83eb05cd8be4e8b9e77f3f6c782f8346579d0ce588b934",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "复核完整编排测试：unit-token、unit-secret 和 unit 口令均为固定合成值，用于检查子进程环境清除、凭据不写日志；GitHub 与发布写操作使用明确的受控夹具，不含生产凭据。",
+      "reviewed_lines": [
+        189
+      ],
+      "reviewed_rules": [
+        "credential_literal"
+      ]
     }
   ],
   "baseline_note": "The index snapshot records the original review baseline; each explicitly reviewed current file is bound by its own SHA-256."

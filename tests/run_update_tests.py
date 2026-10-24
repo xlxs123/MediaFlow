@@ -24,7 +24,8 @@ GROUPS = {
              'test_online_update', 'test_update_transport', 'test_update_channel',
              'test_hosted_release', 'test_release_workflow', 'test_brand_migration',
              'test_security', 'test_tool_manager', 'test_update_github',
-             'test_public_source_audit', 'test_release_structure', 'test_github_publisher'],
+             'test_public_source_audit', 'test_release_structure', 'test_github_publisher',
+             'test_ci_build_receipt', 'test_release_pipeline', 'test_accept_release_update'],
     'ui': ['test_update_ui'],
     'output': ['test_output_integration'],
 }
@@ -74,7 +75,10 @@ def run(directory):
                 creationflags=NO_WINDOW)
             try:
                 tree = ProcessTree(process)
-                while process.poll() is None and time.monotonic() - started < 360:
+                # Core includes complete-file receipt/tamper checks. Keep a
+                # finite budget for real disk reads rather than skipping them.
+                timeout = 900 if group == 'core' else 360
+                while process.poll() is None and time.monotonic() - started < timeout:
                     time.sleep(.1)
                 if process.poll() is None:
                     tree.terminate()

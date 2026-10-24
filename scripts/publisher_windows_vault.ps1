@@ -5,7 +5,7 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][ValidateSet('Initialize','Publish')][string]$Operation,
+    [Parameter(Mandatory)][ValidateSet('Initialize','Check','Publish')][string]$Operation,
     [Parameter(Mandatory)][string]$VaultDirectory,
     [Parameter(Mandatory)][string]$KeyId,
     [string]$Python = '',
@@ -63,12 +63,20 @@ try {
         [Security.Cryptography.CryptographicOperations]::ZeroMemory($random)
         Write-Output '{"windows_current_user_protection":true,"initialized":true,"secret_logged":false}'
     } else {
-        foreach ($required in @($ReleaseDirectory,$OutputDirectory,$AcceptanceReceipt,$PackageUrl,$PublishedAt,$ReleasePage,$ReleaseNotesFile)) {
-            if (-not $required) { throw 'Publishing requires explicit accepted release, receipt and actual hosted asset URLs.' }
+        if ($Operation -eq 'Publish') {
+            foreach ($required in @($ReleaseDirectory,$OutputDirectory,$AcceptanceReceipt,$PackageUrl,$PublishedAt,$ReleasePage,$ReleaseNotesFile)) {
+                if (-not $required) { throw 'Publishing requires explicit accepted release, receipt and actual hosted asset URLs.' }
+            }
         }
         Assert-VaultAcl $vault
         $plain = [Security.Cryptography.ProtectedData]::Unprotect([IO.File]::ReadAllBytes($passwordFile),$entropy,$scope)
         [Environment]::SetEnvironmentVariable($envName,[Text.Encoding]::UTF8.GetString($plain))
+        if ($Operation -eq 'Check') {
+            & $Python -X utf8 -B (Join-Path $PSScriptRoot 'release_pipeline.py') check-key `
+                --private-key-file $keyFile --public-keys-file $publicFile --key-id $KeyId --password-env $envName
+            if ($LASTEXITCODE -ne 0) { throw 'Formal vault key did not match the approved embedded publisher key.' }
+            return
+        }
         $notes = [IO.File]::ReadAllText([IO.Path]::GetFullPath($ReleaseNotesFile),[Text.Encoding]::UTF8)
         & $Python -X utf8 -B (Join-Path $PSScriptRoot 'publish_release.py') publish `
             --release-dir $ReleaseDirectory --output-dir $OutputDirectory --package-url $PackageUrl `

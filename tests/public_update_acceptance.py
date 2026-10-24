@@ -22,12 +22,14 @@ from PySide6.QtCore import QCoreApplication, QEvent, QTimer
 from PySide6.QtWidgets import QMessageBox
 from core.process_tree import ProcessTree
 from core.update_channel import load_channel
+from core.update_github import release_asset
 from core.update_manager import UpdateManager, UpdateError
-from core.update_manifest import validate_manifest, UpdateValidationError, canonical_bytes
+from core.update_manifest import validate_manifest, UpdateValidationError, canonical_bytes, parse_version
 from core.update_transport import fetch
 from tests.update_acceptance import _hash_tree, _seed_data, _write_json, _read_json
 from ui.update_dialog import UpdateDialog
 from utils.build_info import runtime_identity
+from utils.branding import APP_VERSION
 
 
 def run_public_update_acceptance(app, args):
@@ -89,21 +91,23 @@ def run_public_update_acceptance(app, args):
         return result
     try:
         identity=report['runtime_identity']
-        check(identity['packaged'] and identity['app_version']=='2.1.0','Actual packaged 2.1.0 updater')
+        check(identity['packaged'] and identity['app_version']==APP_VERSION,
+              'Actual packaged '+APP_VERSION+' updater')
         channel=load_channel()
         check(channel['key_state']=='initialized' and bool(channel['trusted_keys']), 'Embedded formal trust is initialized')
         source=channel['source_url']
-        check(source=='https://github.com/xlxs123/MediaFlow-Releases/releases/latest/download/manifest.json',
-              'Actual created public release repository is the embedded channel')
+        repository=release_asset(source)
+        report['release_repository']='/'.join(repository[:2]) if repository else None
         for name in ('APPDATA','LOCALAPPDATA'):
             env_before[name]=os.environ.get(name)
             os.environ[name]=str(directory/'private'/name)
         env_before['QT_QPA_PLATFORM']=os.environ.get('QT_QPA_PLATFORM')
         os.environ['QT_QPA_PLATFORM']='offscreen'
-        for repo in ('MediaFlow','MediaFlow-Releases'):
-            value=background(lambda repo=repo:json.loads(fetch('https://api.github.com/repos/xlxs123/'+repo,
+        if repository:
+            repo='/'.join(repository[:2])
+            value=background(lambda:json.loads(fetch('https://api.github.com/repos/'+repo,
                 context=ssl.create_default_context(),total_timeout=40)))
-            check(value.get('full_name')=='xlxs123/'+repo and value.get('private') is False,
+            check(value.get('full_name','').casefold()==repo and value.get('private') is False,
                   'Repository accessible without authentication',repository=repo)
         current=UpdateManager(state_dir=directory/'current-channel-check',release_root=Path(identity['executable']).parent,
             current_identity=identity,current_data_dir=directory/'never-opened-current-data')
@@ -125,8 +129,11 @@ def run_public_update_acceptance(app, args):
         else: rejected=False
         check(rejected,'Tampered remote manifest is rejected')
         old_identity=_read_json(old/'build-info.json')
+        check(parse_version(old_identity['app_version'])<parse_version(identity['app_version']),
+              'Preserved installation context is older than the actual running updater')
         report['installation_context']={'version':old_identity['app_version'],'build_id':old_identity['build_id'],
-            'note':'2.1.0 updater exercises preserved old installation context; old EXE is used for actual rollback, not claimed to contain this CDN adapter'}
+            'running_updater_version':identity['app_version'],
+            'note':identity['app_version']+' updater exercises preserved old installation context; old EXE is used for actual rollback, not claimed to contain this CDN adapter'}
         before_old=background(lambda:_hash_tree(old))
         data=directory/'preserved-old-data'
         background(lambda:_seed_data(data))

@@ -123,6 +123,24 @@ jobs:
               --runtime-identity $privateIdentity --report verification/ci/release-structure.json
           if ($LASTEXITCODE -ne 0) { throw 'Complete portable-release structure check failed.' }
 
+      - name: Bind passed CI checks to the complete build
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # This unsigned receipt binds bytes and reports. The local release
+          # orchestrator separately verifies the GitHub run and artifact digest.
+          $commit = (& git rev-parse --verify HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $commit -ne $env:GITHUB_SHA) {
+            throw 'The actual checkout commit does not match this GitHub run.'
+          }
+          & .\.venv\Scripts\python.exe -X utf8 -B scripts\ci_build_receipt.py create `
+              --release-dir dist-mediaflow-ci --expected-version $env:MEDIAFLOW_BUILD_VERSION `
+              --runtime-identity (Join-Path $env:RUNNER_TEMP 'mediaflow-ci-runtime-identity.json') `
+              --test-results verification/ci/update/results.json `
+              --structure-report verification/ci/release-structure.json `
+              --repository $env:GITHUB_REPOSITORY --commit $commit --run-id $env:GITHUB_RUN_ID `
+              --output verification/ci/build-attestation.json
+          if ($LASTEXITCODE -ne 0) { throw 'CI build receipt validation failed; no passed build will be retained.' }
+
       - name: Retain passed build and public summaries
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # verified upstream v4
         with:
@@ -131,6 +149,7 @@ jobs:
             dist-mediaflow-ci/
             verification/ci/release-structure.json
             verification/ci/update/results.json
+            verification/ci/build-attestation.json
           if-no-files-found: error
           retention-days: 7
 

@@ -36,6 +36,8 @@ pwsh -NoProfile -File build.ps1 -SkipTests
 
 普通 GitHub Actions 只测试和构建，不持有正式私钥，不发布稳定版本。正式签名在发布者受保护的本地环境完成。
 
+发布者使用统一入口 `scripts/release_mediaflow.ps1 -Version <当前版本> -DryRun` 演练，确认后使用独立的 `-Publish` 模式正式发布。它核验同一提交的 Windows CI 产物，复用正式保险库签名、草稿核验和实际客户端公网验收；详情见 [自动发布说明](docs/RELEASE_AUTOMATION.md)。演练不创建新 Release，也不覆盖既有版本。
+
 ## 文档和许可证
 
 - [工具自动发现](MEDIAFLOW_TOOLS.md)、[浏览器发现](MEDIA_DISCOVERY.md)
