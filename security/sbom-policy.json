@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "format": "CycloneDX",
+  "spec_version": "1.6",
+  "schema_url": "https://raw.githubusercontent.com/CycloneDX/specification/1.6/schema/bom-1.6.schema.json",
+  "required_evidence": ["ci_build_receipt", "Analysis-00.toc", "PYZ-00.toc", "PKG-00.toc", "embedded_archive", "distribution_RECORD"],
+  "environment_is_runtime_inventory": false,
+  "full_release_inventory_required": true,
+  "unknown_versions": "omit version and record the limitation; never infer from unverified local filenames",
+  "build_tools": ["pip", "PyInstaller", "pyinstaller-hooks-contrib", "altgraph", "pefile", "pywin32-ctypes"],
+  "limitations": [
+    "A locally verified unsigned CI receipt binds files and reported checks; it is not a signed build provenance attestation.",
+    "Native and statically linked dependencies inside FFmpeg, Qt, OpenSSL, yt-dlp and WebView2 are not exhaustively enumerated. Included notices are not proof that every listed upstream component is linked.",
+    "Build tool versions describe the observed build environment. They are not added as application runtime dependencies unless independently present in the actual archive.",
+    "The externally installed Microsoft Edge WebView2 Runtime and operating-system frameworks are not distributed inside the portable release and are not reported as bundled components."
+  ]
+}

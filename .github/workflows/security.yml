@@ -1,0 +1,160 @@
+name: Security and supply chain
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '23 1 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mediaflow-security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  codeql:
+    name: CodeQL / Python
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1; official tag verified
+        with:
+          persist-credentials: false
+      - name: Initialize official Python CodeQL
+        uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1; official tag verified
+        with:
+          languages: python
+          build-mode: none
+          queries: security-extended
+      - name: Analyze and upload CodeQL results
+        uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          category: /language:python
+          output: verification/security/codeql
+      - name: Block unresolved security findings
+        run: python3 scripts/security_gate.py sarif --directory verification/security/codeql --output verification/security/codeql-summary.json
+      - name: Retain CodeQL evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2; official tag verified
+        with:
+          name: MediaFlow-security-codeql-${{ github.run_id }}
+          path: |
+            verification/security/codeql/
+            verification/security/codeql-summary.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  dependencies:
+    name: Resolved Python dependencies
+    runs-on: windows-2022
+    timeout-minutes: 20
+    env:
+      PYTHONIOENCODING: utf-8
+      PIP_DISABLE_PIP_VERSION_CHECK: '1'
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0; official tag verified
+        with:
+          python-version: '3.14'
+          architecture: x64
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-build.txt
+            requirements-security.txt
+      - name: Prepare independent build and audit environments
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python -m venv .venv
+          if ($LASTEXITCODE -ne 0) { throw 'Build environment creation failed.' }
+          & .\.venv\Scripts\python.exe -m pip install -r requirements-build.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned secure bootstrap installation failed.' }
+          & .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Actual build dependency resolution failed.' }
+          python -m venv .security-venv
+          if ($LASTEXITCODE -ne 0) { throw 'Audit environment creation failed.' }
+          & .\.security-venv\Scripts\python.exe -m pip install -r requirements-build.txt -r requirements-security.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned audit tooling installation failed.' }
+      - name: Audit all resolved build dependencies
+        shell: pwsh
+        run: |
+          & .\.security-venv\Scripts\python.exe -B scripts/audit_dependencies.py `
+            --environment-python .venv/Scripts/python.exe `
+            --audit-python .security-venv/Scripts/python.exe `
+            --output verification/security/dependencies
+          if ($LASTEXITCODE -ne 0) { throw 'Dependency vulnerability or incomplete coverage; see redacted JSON.' }
+      - name: Retain structured vulnerability evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: MediaFlow-security-dependencies-${{ github.run_id }}
+          path: verification/security/dependencies/
+          if-no-files-found: warn
+          retention-days: 30
+
+  secrets:
+    name: Git history and staged secrets
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout complete history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prepare checksum-pinned gitleaks
+        run: python3 scripts/security_tools.py --tool gitleaks --directory "$RUNNER_TEMP/mediaflow-gitleaks"
+      - name: Scan complete public Git history and index
+        run: python3 scripts/scan_secrets.py --gitleaks "$RUNNER_TEMP/mediaflow-gitleaks/gitleaks" --output verification/security/secrets
+      - name: Retain redacted secret-scan evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: MediaFlow-security-secrets-${{ github.run_id }}
+          path: verification/security/secrets/
+          if-no-files-found: warn
+          retention-days: 30
+
+  workflow-policy:
+    name: Workflow security policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install isolated workflow parser
+        run: |
+          python3 -m venv .security-venv
+          .security-venv/bin/python -m pip install -r requirements-build.txt -r requirements-security.txt
+      - name: Prepare checksum-pinned actionlint
+        run: python3 scripts/security_tools.py --tool actionlint --directory "$RUNNER_TEMP/mediaflow-actionlint"
+      - name: Validate GitHub Actions syntax
+        run: '"$RUNNER_TEMP/mediaflow-actionlint/actionlint"'
+      - name: Enforce immutable Actions and job permissions
+        run: .security-venv/bin/python scripts/security_gate.py workflows --output verification/security/workflow-policy.json
+      - name: Run security automation contracts
+        run: .security-venv/bin/python -B -m unittest tests.test_security_gate tests.test_security_tools tests.test_sbom_validation tests.test_workflow_policy -v
+      - name: Retain workflow policy evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: MediaFlow-security-policy-${{ github.run_id }}
+          path: verification/security/workflow-policy.json
+          if-no-files-found: warn
+          retention-days: 30

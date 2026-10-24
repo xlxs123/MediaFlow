@@ -24,6 +24,7 @@ if (-not (Test-Path -LiteralPath $venvPython)) {
     Invoke-Checked $Python @('-m', 'venv', '.venv')
 }
 if (-not $SkipDependencyInstall) {
+    Invoke-Checked $venvPython @('-m', 'pip', 'install', '-r', 'requirements-build.txt')
     Invoke-Checked $venvPython @('-m', 'pip', 'install', '-r', 'requirements.txt')
 }
 Invoke-Checked $venvPython @('assets\create_icon.py')
@@ -32,7 +33,16 @@ if (-not $SkipToolDownload) {
 }
 if (-not $SkipTests) {
     $env:PYTHONIOENCODING = 'utf-8'
-    Invoke-Checked $venvPython @('tests\run_unit_tests.py')
+    # Security-only parsers and schema tooling must not enter the packaged venv.
+    $securityPython = Join-Path $PSScriptRoot '.security-venv\Scripts\python.exe'
+    if (-not (Test-Path -LiteralPath $securityPython)) {
+        if ($SkipDependencyInstall) { throw '独立安全测试环境缺失；请先安装 requirements-security.txt，或允许安装依赖。' }
+        Invoke-Checked $Python @('-m', 'venv', '.security-venv')
+    }
+    if (-not $SkipDependencyInstall) {
+        Invoke-Checked $securityPython @('-m', 'pip', 'install', '-r', 'requirements-build.txt', '-r', 'requirements-security.txt')
+    }
+    Invoke-Checked $venvPython @('tests\run_unit_tests.py', '--security-python', $securityPython)
 }
 Invoke-Checked $venvPython @('tools\prepare_browser_notices.py')
 & (Join-Path $PSScriptRoot 'scripts\build-recycle.ps1')

@@ -34,6 +34,7 @@ from scripts.package_update import _plain, _read_stamp
 from scripts.publish_release import _file_hash, _read_document, _private_key, _trusted_keys
 from scripts.publish_github_release import prepare_assets, verified_asset_urls
 from scripts.verify_hosted_release import _match_release_inventory
+from scripts.security_gate import verify_security_run, verify_ci_provenance
 from utils.branding import APP_VERSION
 from utils.build_info import source_digest
 
@@ -139,6 +140,9 @@ class GitHub:
     def release(self,name,version):
         return self.api('repos/'+name+'/releases/tags/v'+version,missing=True)
 
+    def security(self,repo,commit,*,default_branch,wait_seconds=1200):
+        return verify_security_run(self,repo,commit,default_branch=default_branch,wait_seconds=wait_seconds)
+
     def ci(self,repo,commit,version,*,run_id='',wait_seconds=1200):
         if run_id and not re.fullmatch(r'[0-9]{1,20}',run_id):raise PipelineError('CI run ID 必须是实际的数字标识。')
         deadline=time.monotonic()+wait_seconds
@@ -163,7 +167,10 @@ class GitHub:
         steps={s['name']:s.get('conclusion') for j in jobs for s in j.get('steps',[])}
         required=('Update, signature, deployment and rollback regression','Build an independent Windows folder',
                   'Start the packaged EXE and check complete release structure','Bind passed CI checks to the complete build',
-                  'Retain passed build and public summaries')
+                  'Generate and independently validate actual-package SBOM',
+                  'Retain passed build and public summaries',
+                  'Attest actual EXE, byte-bound receipt and check reports',
+                  'Retain official Sigstore verification bundle')
         if not all(steps.get(name)=='success' for name in required):
             raise PipelineError('CI 缺少通过的测试、构建、实际 EXE 检查或产物保存步骤。')
         artifacts=self.api('repos/'+repo+'/actions/runs/'+identifier+'/artifacts')['artifacts']
@@ -202,8 +209,9 @@ class GitHub:
             finally:
                 if tree:tree.close()
         result=extract_ci_artifact(archive_path,output,artifact,repo,ci['commit'],ci['run_id'],version,source_sha)
-        result.update(ci_provenance_verified=True,
-            provenance='successful authenticated workflow API + downloaded API artifact digest + complete byte-bound receipt')
+        proof=verify_ci_provenance(self,repo,ci['commit'],ci['run_id'],output/'verification/ci/build-attestation.json')
+        result.update(ci_provenance_verified=True,cryptographic_provenance=proof,
+            provenance='Official GitHub OIDC/Sigstore attestation verified for the exact byte-bound receipt, source commit and CI run')
         return result
 
 
@@ -408,6 +416,10 @@ class Pipeline:
         if latest and not self.dry and not self.args.resume:
             newest=parse_version(latest.get('tag_name','').removeprefix('v'))
             if version<=newest:raise PipelineError('正式入口不发布相同或更低版本；不会将旧版本重新标记为 latest。')
+        self.report['security']=self.github.security(self.source_repo,commit,
+            default_branch=self.source_info['default_branch'],wait_seconds=self.args.ci_wait_seconds)
+        if self.report['security'].get('passed') is not True:
+            raise PipelineError('当前提交的安全工作流未通过；禁止读取正式保险库或继续发布。')
         self.vault=find_vault(self.args.vault_directory,self.key_id,self.channel)
         if self.vault.is_relative_to(self.root):raise PipelineError('正式密钥保险库必须在源码和运行目录之外。')
         self.notes=_plain(self.args.release_notes_file or self.root/'RELEASE_NOTES.md').resolve()
@@ -454,6 +466,17 @@ class Pipeline:
             self.release=_plain(self.args.existing_release_dir).resolve()
             if self.directory.is_relative_to(self.release):raise PipelineError('运行目录不能位于既有发布目录中。')
             self.report['build']=dict(mode='reused-accepted-release',new_exe_built=False)
+            if not self.dry:
+                from scripts.ci_build_receipt import verify_receipt
+                receipt=self.release.parent/'verification/ci/build-attestation.json'
+                if not receipt.is_file():
+                    raise PipelineError('正式复用需要原 CI 目录及相邻的已证明构建收据；不能用本地验收替代来源验证。')
+                bound=verify_receipt(receipt,self.release,expected_version=self.args.version,
+                    expected_repository=self.source_repo,expected_commit=self.report['commit'],
+                    expected_run_id=self.ci['run_id'],expected_source_sha256=source_digest(self.root))
+                proof=verify_ci_provenance(self.github,self.source_repo,self.report['commit'],self.ci['run_id'],receipt,
+                    default_branch=self.source_info['default_branch'])
+                self.report['build'].update(byte_binding=bound,cryptographic_provenance=proof)
         else:
             self.event('verified-windows-ci-artifact')
             fetched=self.github.fetch_build(self.ci,self.source_repo,self.args.version,self.root,

@@ -25,7 +25,8 @@ GROUPS = {
              'test_hosted_release', 'test_release_workflow', 'test_brand_migration',
              'test_security', 'test_tool_manager', 'test_update_github',
              'test_public_source_audit', 'test_release_structure', 'test_github_publisher',
-             'test_ci_build_receipt', 'test_release_pipeline', 'test_accept_release_update'],
+             'test_ci_build_receipt', 'test_release_pipeline', 'test_accept_release_update',
+             'test_dependency_audit', 'test_secret_scan', 'test_sbom', 'test_security_gate', 'test_security_tools'],
     'ui': ['test_update_ui'],
     'output': ['test_output_integration'],
 }

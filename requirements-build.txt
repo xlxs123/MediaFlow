@@ -1,0 +1,3 @@
+# Build/bootstrap only; not included as an application runtime component.
+# Minimum release fixing the known pip advisories found in the baseline audit.
+pip==26.2

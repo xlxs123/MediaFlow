@@ -1025,10 +1025,10 @@
     },
     {
       "path": "tests/test_public_source_audit.py",
-      "sha256": "748545ac639c5f8bd61047238da2257ff31248354667d8ad017d56fdbe341a1e",
+      "sha256": "8f612c99e905e6683883fed0f0b284c66ba69b92b80f5bd7ed216949b6aba6c3",
       "classification": "synthetic_test_data",
       "reviewed_by": "Codex source disclosure review",
-      "reason": "复核本文件现场构造无效凭据形态、私钥标记和个人路径负例；完整私钥形态由无密码学意义的字符串在临时目录组合。 主代理复核新增独立 HTTP 头合成负例；标记是临时夹具和运行时生成的测试密钥，不是实际凭据。",
+      "reason": "已复核完整文件；全部敏感值是临时合成扫描夹具，新测试仅核实精确公开配置路径，不开放安全目录整体或真实用户数据。",
       "reviewed_lines": [
         45,
         56,
@@ -1040,6 +1040,7 @@
         194
       ],
       "reviewed_rules": [
+        "credential_header_literal",
         "credential_literal",
         "private_key_generation"
       ]
@@ -1513,15 +1514,45 @@
     },
     {
       "path": "tests/test_release_pipeline.py",
-      "sha256": "64e9473684ba8aa34a83eb05cd8be4e8b9e77f3f6c782f8346579d0ce588b934",
+      "sha256": "2727db1a34a3f097084d82ee9d38cc0ea3fa6cdfd150add4369a1423365c95c2",
       "classification": "synthetic_test_data",
       "reviewed_by": "Codex source disclosure review",
-      "reason": "复核完整编排测试：unit-token、unit-secret 和 unit 口令均为固定合成值，用于检查子进程环境清除、凭据不写日志；GitHub 与发布写操作使用明确的受控夹具，不含生产凭据。",
+      "reason": "已复核完整文件；凭据与GitHub行为均为合成单测夹具，新增安全门禁测试确认失败后不会访问正式保险库，不含真实签名材料。",
       "reviewed_lines": [
-        189
+        200
       ],
       "reviewed_rules": [
         "credential_literal"
+      ]
+    },
+    {
+      "path": "tests/test_dependency_audit.py",
+      "sha256": "390efb4d7ee7f6b6f2fb09d40065aaee5a1f209722d5023c55d5b87476670fd6",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "已复核完整文件；敏感URL仅为unit.invalid和private.invalid合成失败夹具，用于断言工具错误、skip和说明字段不会进入报告，不包含可用凭据。",
+      "reviewed_lines": [
+        84,
+        106,
+        215,
+        239
+      ],
+      "reviewed_rules": [
+        "sensitive_url_literal"
+      ]
+    },
+    {
+      "path": "tests/test_security_tools.py",
+      "sha256": "ca9e3feb7f6cd6b7f85f062a4efdc71fd134758361de8119627dcd9aadfb66f7",
+      "classification": "synthetic_test_data",
+      "reviewed_by": "Codex source disclosure review",
+      "reason": "已复核完整文件；user:unit-only为固定合成URL用户名密码，用于测试拒绝带凭据地址，网络均由本地mock替代。",
+      "reviewed_lines": [
+        152,
+        170
+      ],
+      "reviewed_rules": [
+        "url_credentials"
       ]
     }
   ],
