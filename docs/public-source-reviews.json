@@ -1485,12 +1485,12 @@
     },
     {
       "path": "tests/test_accept_release_update.py",
-      "sha256": "95dc5271076daf73c3fb2d3e89c169e6e35034dabe35ed8c5871a6d6784002bf",
+      "sha256": "def5b84753199c759190e4bd5a907e45d9e06934bacc11de444e12cbce851ffc",
       "classification": "synthetic_test_data",
       "reviewed_by": "Codex source disclosure review",
-      "reason": "复核完整父驱动测试：授权、密码与自定义CA值都是固定的 unit 合成字符串；子进程由受控夹具替代，测试报告明确标记 unit_process_fixture，不使用真实用户凭据或公网下载。",
+      "reason": "复核完整父驱动测试：授权、密码与自定义CA值都是固定的 unit 合成字符串；子进程由受控夹具替代，测试报告明确标记 unit_process_fixture，不使用真实用户凭据或公网下载。 主代理复核 CI 路径修正：只将测试临时目录规范化，保留全部成功与拒绝断言，并使用真实 Windows 8.3 别名复验。",
       "reviewed_lines": [
-        188
+        190
       ],
       "reviewed_rules": [
         "credential_literal"

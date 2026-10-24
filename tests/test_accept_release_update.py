@@ -24,7 +24,9 @@ class AcceptanceDriverTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix='MediaFlow-acceptance-driver-unit-')
         self.addCleanup(temporary.cleanup)
-        self.root = Path(temporary.name)
+        # Hosted Windows TEMP can use an 8.3 alias (RUNNER~1); the actual
+        # driver canonicalizes input paths before spawning the child.
+        self.root = Path(temporary.name).resolve()
         self.release, self.old = self.root / 'release', self.root / 'old-release'
         self.release.mkdir(); self.old.mkdir()
         self.source = 'https://github.com/unit-owner/MediaFlow-Releases/releases/latest/download/manifest.json'
