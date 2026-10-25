@@ -24,4 +24,11 @@ Windows CI 在实际 EXE 启动及完整结构检查后生成 SBOM，独立保�
 
 ## 待实际运行后补充
 
-本次真实 Windows SBOM 下载地址、组件统计、schema 校验摘要、官方证明束、官方 CLI 验签结果与对应 CI 链接，须在 PR 合入默认分支并实际生成后记录。目前不声称这些远程结果已通过。
+首轮真实 [Windows CI](https://github.com/xlxs123/MediaFlow/actions/runs/40150391740) 已实际生成 [SBOM 资产](https://github.com/xlxs123/MediaFlow/actions/runs/40150391740/artifacts/12581959664)。下载后核对 GitHub 服务端归档大小及 SHA-256，再复制到独立复验目录执行官方 schema 和证据关系校验：42 个实际组件、6 个构建工具、schema 错误 0。原 CI 证据未改写。
+
+- 对应源码为 PR 临时 merge commit `4048b07cd6a30288f5be6ce317c6a6a7e1583f61`。
+- 下载归档 SHA-256：`9de81d2b16c56e0ae75f1bb4856835a58a0f2c02666f8d91ac0cd5511b4a9b13`。
+- BOM SHA-256：`57dd144394e70022b6945bc8fb93664a9e8020a353e88b14b15780341e4d8e60`。
+- inventory SHA-256：`8ff74186794e7976cf88368199725e8b0c8ac6e088eaa7bb40105186f1b99181`。
+
+本次安全修复后的新快照仍需重新构建。PR 证明 Job 按设计跳过，密码学来源证明未计为成功；默认分支生成后的证明束、CLI 验签结果及最终 CI 链接将在实际完成后补充。

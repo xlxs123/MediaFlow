@@ -984,10 +984,10 @@
     },
     {
       "path": "tests/test_output_organization.py",
-      "sha256": "ab6b96d90b0af74f35bf6b879b16792a99515030d9a6b2d03ebd3995beb02693",
+      "sha256": "5634f67f5b3da5747c520526b57b22bdabc8a95e568e2b8fae8bd502e35c6668",
       "classification": "synthetic_test_data",
       "reviewed_by": "Codex source disclosure review",
-      "reason": "复核 secret.test URL 只是非法 media_id 测试输入，输出应采用可靠备用名称。",
+      "reason": "复核 secret.test URL 只是非法 media_id 测试输入，输出应采用可靠备用名称。 复核新增CodeQL域名边界回归：只加入合法及伪域的固定公开测试地址，不新增凭据。",
       "reviewed_lines": [
         91
       ],

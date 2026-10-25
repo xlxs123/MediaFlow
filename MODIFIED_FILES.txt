@@ -7,6 +7,7 @@ SBOM_VERIFICATION.md
 SECURITY_HARDENING_REPORT.md
 SECURITY_SCAN_RESULTS.md
 build.ps1
+core/output_organization.py
 docs/SECURITY_AUTOMATION.md
 docs/public-source-reviews.json
 requirements-build.txt
@@ -27,6 +28,7 @@ security/toolchain.json
 tests/run_unit_tests.py
 tests/run_update_tests.py
 tests/test_dependency_audit.py
+tests/test_output_organization.py
 tests/test_public_source_audit.py
 tests/test_release_pipeline.py
 tests/test_sbom.py
@@ -35,3 +37,4 @@ tests/test_secret_scan.py
 tests/test_security_gate.py
 tests/test_security_tools.py
 tests/test_workflow_policy.py
+tests/update_https_fixture.py

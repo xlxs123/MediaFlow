@@ -21,7 +21,11 @@
 
 ## 远程验收状态
 
-待提交后检查真实 PR 工作流；默认分支合入后检查官方来源证明并使用 `gh attestation verify` 验证。当前不能宣称远程安全扫描、实际新构建 SBOM 或密码学来源证明已通过。
+首轮真实 [PR #1](https://github.com/xlxs123/MediaFlow/pull/1) 验收中，[Windows 构建](https://github.com/xlxs123/MediaFlow/actions/runs/40150391740) 已通过打包、实际 EXE 启动、更新/回退回归与 SBOM 校验。[安全工作流](https://github.com/xlxs123/MediaFlow/actions/runs/40150391793) 的依赖、完整历史秘密及策略检查通过；CodeQL 如实阻断两项发现，没有忽略规则。
+
+两项最小修复分别是 localhost HTTPS 夹具显式设定 TLS 1.2 下限，以及命名元数据提取使用精确域名/点边界子域判断。后者只调整命名来源判断，不改媒体发现或下载。相关 41 项增量及真实 TLSv1.3 证书校验握手通过。修复后的 CodeQL 和完整回归正在重新验证，不能提前计为通过。
+
+真实 Windows SBOM 已下载并独立复验，42 个实际组件、6 个构建工具，官方 schema 零错误。PR 来源证明按设计跳过；只有默认分支合入后实际生成并经 `gh attestation verify` 验证，才能报告密码学来源证明成功。
 
 ## 边界及使用
 

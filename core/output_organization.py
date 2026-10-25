@@ -85,7 +85,8 @@ def make_values(title='', *, site='', source_url='', media_id='', resolution=Non
             parsed = urlsplit(source_url)
             query = parse_qs(parsed.query)
             identity = next((query[key][0] for key in ('modal_id', 'bvid', 'aid', 'v') if query.get(key)), '')
-            if not identity and ('bilibili.com' in (parsed.hostname or '')):
+            host = (parsed.hostname or '').lower()
+            if not identity and (host == 'bilibili.com' or host.endswith('.bilibili.com')):
                 match = re.search(r'/video/(BV[A-Za-z0-9]+)', parsed.path)
                 identity = match[1] if match else ''
         except ValueError:
