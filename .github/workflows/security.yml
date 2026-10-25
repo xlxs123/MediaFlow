@@ -20,6 +20,9 @@ jobs:
     name: CodeQL / Python
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      # Official pinned Action feature flag: PR scans must cover the whole repo.
+      CODEQL_ACTION_DIFF_INFORMED_QUERIES: 'false'
     permissions:
       contents: read
       actions: read
@@ -149,7 +152,7 @@ jobs:
       - name: Enforce immutable Actions and job permissions
         run: .security-venv/bin/python scripts/security_gate.py workflows --output verification/security/workflow-policy.json
       - name: Run security automation contracts
-        run: .security-venv/bin/python -B -m unittest tests.test_security_gate tests.test_security_tools tests.test_sbom_validation tests.test_workflow_policy -v
+        run: .security-venv/bin/python -B -m unittest tests.test_security_gate tests.test_security_tools tests.test_sbom_validation tests.test_workflow_policy tests.test_codeql_reviews -v
       - name: Retain workflow policy evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

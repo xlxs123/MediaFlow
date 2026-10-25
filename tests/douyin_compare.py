@@ -91,7 +91,7 @@ class Evidence:
         self.api_targets = []
         self.api_resources = {}
         self.api_paths = {}
-        self.api_tokens = set()
+        self.api_media_ids = set()
         self.playback_guard = []
         self.last_candidates = []
         self.navigation = []
@@ -171,9 +171,13 @@ class Evidence:
                         while pending and len(urls) < 128:
                             value = pending.pop()
                             if isinstance(value, dict):
-                                for name, token in value.items():
-                                    if name in ('uri','vid','video_id','file_id') and isinstance(token, str) and len(token) >= 12:
-                                        self.api_tokens.add(token)
+                                for name, media_id in value.items():
+                                    # These are media correlation IDs, not auth
+                                    # credentials. Do not retain signed URLs or
+                                    # query/header values as opaque identifiers.
+                                    if (name in ('uri','vid','video_id','file_id') and isinstance(media_id, str)
+                                            and re.fullmatch(r'[A-Za-z0-9._/-]{12,512}', media_id)):
+                                        self.api_media_ids.add(media_id)
                                 pending.extend(value.values())
                             elif isinstance(value, list): pending.extend(value[:200])
                             elif isinstance(value, str) and value.startswith(('https://','http://')): urls.append(value)
@@ -213,7 +217,7 @@ class Evidence:
                 'intrinsic_mp4':{k:v for k,v in c.metadata.get('intrinsic_mp4',{}).items()
                     if k in ('has_video','duration','width','height','videoCodec','audioCodec',
                              'video_track_count','audio_track_count','unknown_track_count')},
-                'api_identity_match':any(token in unquote(c.final_url) for token in self.api_tokens),
+                'api_identity_match':any(media_id in unquote(c.final_url) for media_id in self.api_media_ids),
                 'confidence': c.confidence,'quality': c.qualityScore,'drm': c.drm,'validated':c.validated,
                 'downloadable': c.downloadable,'requires_confirmation':c.requires_confirmation,
                 'unavailable_reasons': [re.sub(r'https?://[^\s\"<>]+',lambda m:safe_url(m[0]),str(v))[:250] for v in c.unavailable_reasons],
@@ -258,7 +262,8 @@ class Evidence:
             'media_requests':len(media),'deduplicated_media_resources':len({r.get('resource') for r in media}),
             'targets':self.targets,'observations':list(self.observations.values()),'dom':self.dom,'pages':self.pages,
             'api_target_records':self.api_targets,'candidate_timeline':self.candidate_timeline,
-            'api_token_hashes':sorted(digest(token) for token in self.api_tokens),
+            # Legacy output key: hashes of media IDs only, never passwords.
+            'api_token_hashes':sorted(digest(media_id) for media_id in self.api_media_ids),
             'navigation':self.navigation,
             'playback_guard':self.playback_guard,
             'candidates':self.last_candidates,'current_page_url':page_url(dialog.page.url().toString()),

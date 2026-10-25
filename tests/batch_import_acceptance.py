@@ -46,6 +46,16 @@ class _LocalBatchPages:
 
     def __init__(self, directory, port=0):
         self.directory = Path(directory)
+        # Requests choose a registered local fixture; they never form a path.
+        self.media_files = {
+            'Direct': {'direct.mp4': self.directory / 'direct.mp4'},
+            'HLS': {'source.m3u8': self.directory / 'source.m3u8'},
+            'DASH': {'source.mpd': self.directory / 'dash' / 'source.mpd'},
+        }
+        self.media_files['HLS'].update({path.name: path for path in self.directory.glob('part*.ts')
+            if re.fullmatch(r'part\d+\.ts', path.name) and not path.is_symlink()})
+        self.media_files['DASH'].update({path.name: path for path in (self.directory / 'dash').glob('*.m4s')
+            if re.fullmatch(r'(?:init|chunk)-stream\d+(?:-\d+)?\.m4s', path.name) and not path.is_symlink()})
         self.requests = []
         self.lock = threading.Lock()
         self.segment_active = {}
@@ -86,14 +96,8 @@ class _LocalBatchPages:
                     if len(parts) == 4:
                         identity, filename = parts[2:]
                         kind = owner.KINDS.get(identity)
-                        target = None
-                        if kind == 'Direct' and filename == 'direct.mp4':
-                            target = owner.directory / filename
-                        elif kind == 'HLS' and (filename == 'source.m3u8' or re.fullmatch(r'part\d+\.ts', filename)):
-                            target = owner.directory / filename
-                        elif kind == 'DASH' and (filename == 'source.mpd' or re.fullmatch(r'(?:init|chunk)-stream\d+(?:-\d+)?\.m4s', filename)):
-                            target = owner.directory / 'dash' / filename
-                        if target is not None and target.is_file():
+                        target = owner.media_files.get(kind, {}).get(filename)
+                        if target is not None and not target.is_symlink() and target.is_file():
                             status, body = 200, target.read_bytes()
                             mime = {'.mp4': 'video/mp4', '.m3u8': 'application/vnd.apple.mpegurl',
                                     '.mpd': 'application/dash+xml', '.ts': 'video/mp2t',

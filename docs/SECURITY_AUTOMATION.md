@@ -11,6 +11,10 @@
 
 所有依赖与 Actions 更新均进入 PR，不自动合并。Dependabot 将低风险 Python 更新和 Actions 更新分别分组；Actions pin 更新必须同时核对官方仓库的标签、提交和入口文件，并更新 `security/toolchain.json`。不能通过移除检查或修改生产信任配置处理更新失败。
 
+CodeQL 在 PR 默认可能只报告差异范围；本项目已按固定 Action 的官方 feature-flags.ts 设置 `CODEQL_ACTION_DIFF_INFORMED_QUERIES=false`，PR 与默认分支都要求完整结果。SARIF 若声明 diff-informed 会直接失败。配置被改回差异过滤时，工作流策略也会阻断。
+
+`security/codeql-reviews.json` 仅记录已经实际证明不含秘密的公开验证材料误报。每项绑定官方 partial fingerprints、全部完整 codeFlows（保留 source 顺序、数量及全部字段）、主位置和所有相关文件/验证器的完整 SHA-256。不忽略整规则、文件或目录，不把通用 JSON writer 当作安全过滤器。新增 source、不同数据流、位置/指纹或源码改变均不能复用审核。原 SARIF 始终保留，报告分别显示 total、reviewed_public_metadata 与 unresolved；已审核误报不能描述为原始零发现。真实契约测试另验证私钥/密码/Cookie 字段被公钥 schema 拒绝，运行身份仅含公开 key ID/公钥指纹。
+
 ## 本地执行
 
 使用两个独立虚拟环境：构建环境安装 `requirements-build.txt` 和 `requirements.txt`，审计环境安装 `requirements-build.txt` 和 `requirements-security.txt`。不要将审计工具装进应用打包环境。当前构建 bootstrap 固定 pip 26.2，修复首次实际审计发现的 pip 25.2 漏洞；应用原有六个依赖 pin 不变。

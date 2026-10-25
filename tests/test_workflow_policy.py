@@ -23,6 +23,14 @@ class WorkflowPolicyTests(unittest.TestCase):
     def test_reviewed_actual_workflows_pass(self):
         self.assertTrue(gate.workflow_policy(self.root)['passed'])
 
+    def test_pr_scan_cannot_reenable_diff_only_results(self):
+        workflow = self.root / '.github/workflows/security.yml'
+        workflow.write_text(workflow.read_text('utf-8').replace(
+            "CODEQL_ACTION_DIFF_INFORMED_QUERIES: 'false'", "CODEQL_ACTION_DIFF_INFORMED_QUERIES: 'true'"), 'utf-8')
+        result = gate.workflow_policy(self.root)
+        self.assertFalse(result['passed'])
+        self.assertTrue(any('diff-informed' in error for error in result['errors']))
+
     def test_job_level_reusable_workflow_cannot_bypass_step_pins(self):
         self.extra('reusable.yml', '  delegate:\n    uses: other/project/.github/workflows/build.yml@main\n')
         result = gate.workflow_policy(self.root)

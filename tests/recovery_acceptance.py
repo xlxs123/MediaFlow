@@ -178,6 +178,11 @@ class _FixtureServer:
 
     def __init__(self, assets):
         self.assets = assets
+        # Bind segment names to owned fixture paths before accepting requests.
+        hls_directory = assets.get('hls')
+        self.segments = ({path.name: path for path in Path(hls_directory).glob('segment*.ts')
+            if re.fullmatch(r'segment\d{3}\.ts', path.name) and not path.is_symlink()}
+            if hls_directory is not None else {})
         self.lock = threading.RLock()
         self.requests = []
         self.cut = set()
@@ -246,11 +251,10 @@ class _FixtureServer:
         if name == 'page.html':
             return self.assets['page'], 'text/html; charset=utf-8'
         if name == 'index.m3u8':
-            return self.assets['hls'] / name, 'application/vnd.apple.mpegurl'
-        if re.fullmatch(r'segment\d{3}\.ts', name):
-            path = self.assets['hls'] / name
-            if path.is_file():
-                return path, 'video/mp2t'
+            return self.assets['hls'] / 'index.m3u8', 'application/vnd.apple.mpegurl'
+        path = self.segments.get(name)
+        if path is not None and not path.is_symlink() and path.is_file():
+            return path, 'video/mp2t'
         return None, ''
 
     def serve(self, handler, *, head):
