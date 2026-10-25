@@ -105,8 +105,12 @@ class CurrentRouFixture:
                 self.send_response(status)
                 self.send_header('Content-Type',mime)
                 self.send_header('Content-Length',str(len(data)))
-                if self.headers.get('Origin') and 'Access-Control-Allow-Origin' not in (headers or {}):
-                    self.send_header('Access-Control-Allow-Origin',self.headers['Origin'])
+                # Echo only a canonical fixture origin, never the request value.
+                origins = {f'http://127.0.0.1:{server.server_port}': f'http://127.0.0.1:{server.server_port}'
+                           for server in fixture.servers}
+                origin = origins.get(self.headers.get('Origin', ''))
+                if origin and 'Access-Control-Allow-Origin' not in (headers or {}):
+                    self.send_header('Access-Control-Allow-Origin', origin)
                     self.send_header('Access-Control-Allow-Credentials','true')
                 for key,value in (headers or {}).items():
                     self.send_header(key,value)

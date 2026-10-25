@@ -178,10 +178,10 @@
     },
     {
       "path": "tests/rou_current_fixture.py",
-      "sha256": "6cd9ddb747d6e4bdb13e6e31ac959acb166740edb29d86b75e4ca8d86d08fe6f",
+      "sha256": "ce6e9c1abf1c9e027a9b1ee1807f7905853287e9317b1b2ba2c2c1377fa7813f",
       "classification": "synthetic_test_data",
       "reviewed_by": "Codex source disclosure review",
-      "reason": "复核 CurrentRouFixture 的本地授权 cookie 为明示合成常量，仅在自建 HTTPHandler 中校验。",
+      "reason": "复核 CurrentRouFixture 的本地授权 cookie 为明示合成常量，仅在自建 HTTPHandler 中校验。 复核本次仅将CORS响应限定为规范本地端口Origin，合成Cookie仍在原第30行；未加入真实凭据。",
       "reviewed_lines": [
         30
       ],

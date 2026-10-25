@@ -178,6 +178,11 @@ class SarifGateTests(unittest.TestCase):
         self.write({'invocations': [{'executionSuccessful': True}], 'results': []})
         self.assertTrue(gate.scan_sarif(self.directory)['passed'])
 
+    def test_diff_informed_results_cannot_certify_the_complete_repository(self):
+        self.write({'properties': {'incrementalMode': 'diff-informed'}, 'results': []})
+        with self.assertRaisesRegex(gate.SecurityGateError, 'complete repository'):
+            gate.scan_sarif(self.directory)
+
     def test_failed_analysis_blocks_even_without_results(self):
         self.write({'invocations': [{'executionSuccessful': False}], 'results': []})
         with self.assertRaisesRegex(gate.SecurityGateError, 'unsuccessful'):

@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import time
 
@@ -121,11 +122,150 @@ def verify_ci_provenance(client, repository, commit, run_id, path, *, default_br
         predicate_type=PROVENANCE_TYPE, invocations=accepted)
 
 
-def scan_sarif(directory):
+PUBLIC_METADATA_RULES = frozenset(('py/clear-text-storage-sensitive-data', 'py/clear-text-logging-sensitive-data'))
+PUBLIC_METADATA_GUARDS = frozenset(('core/update_manifest.py', 'core/update_channel.py',
+    'utils/build_info.py', 'assets/update-channel.json'))
+
+
+def _review_path(value):
+    if (not isinstance(value, str) or not value or '\\' in value or ':' in value
+        or any(ord(c) < 32 for c in value) or any(c in value for c in '*?[')
+        or PurePosixPath(value).is_absolute() or any(part in ('', '.', '..') for part in value.split('/'))):
+        raise SecurityGateError('CodeQL review requires exact repository-relative source paths.')
+    return value
+
+
+def codeql_primary(entry):
+    location = next(iter(entry.get('locations', [])), {}).get('physicalLocation', {})
+    return dict(path=_review_path(location.get('artifactLocation', {}).get('uri')),
+        region=deepcopy(location.get('region', {})))
+
+
+def _canonical_flow_json(value):
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False)
+
+
+def codeql_flow_digest(entry):
+    flows = deepcopy(entry.get('codeFlows', []))
+    if not flows:
+        return ''
+
+    def normalize(value):
+        if isinstance(value, dict):
+            artifact = value.get('artifactLocation')
+            if isinstance(artifact, dict):
+                # Indexes refer to the SARIF artifact table, not source identity.
+                # Drop them only when an explicit exact URI is also present.
+                _review_path(artifact.get('uri'))
+                artifact.pop('index', None)
+            for child in value.values():
+                normalize(child)
+        elif isinstance(value, list):
+            for child in value:
+                normalize(child)
+    normalize(flows)
+    for flow in flows:
+        flow['threadFlows'] = sorted(flow.get('threadFlows', []), key=_canonical_flow_json)
+    flows.sort(key=_canonical_flow_json)
+    return hashlib.sha256(_canonical_flow_json(flows).encode('utf-8')).hexdigest()
+
+
+def _load_codeql_reviews(path):
+    if not path.exists():
+        return []
+    if path.is_symlink() or path.is_junction() or not 0 < path.stat().st_size < 2 * 1024 * 1024:
+        raise SecurityGateError('CodeQL public-metadata review document is invalid.')
+    value = json.loads(path.read_text('utf-8'))
+    if (set(value) != {'schema_version', 'canonicalization', 'reviews'} or value['schema_version'] != 1
+        or value['canonicalization'] != 'codeql-complete-flow-v1' or not isinstance(value['reviews'], list)
+        or len(value['reviews']) > 100):
+        raise SecurityGateError('CodeQL public-metadata review schema is invalid.')
+    required = {'rule_id', 'classification', 'primary_location', 'partial_fingerprints',
+        'codeflows_sha256', 'codeflow_count', 'dependency_sha256', 'reason', 'evidence', 'reviewed_by'}
+    seen = set()
+    for review in value['reviews']:
+        if (not isinstance(review, dict) or set(review) != required
+            or review['rule_id'] not in PUBLIC_METADATA_RULES or review['classification'] != 'reviewed_public_metadata'
+            or not isinstance(review['reason'], str) or len(review['reason']) < 20
+            or not isinstance(review['reviewed_by'], str) or not review['reviewed_by'].strip()
+            or type(review['codeflow_count']) is not int or not 0 < review['codeflow_count'] <= 100
+            or not re.fullmatch('[0-9a-f]{64}', str(review['codeflows_sha256']))):
+            raise SecurityGateError('CodeQL reviews may cover only exact proven public-metadata flows, never whole rules.')
+        primary = review['primary_location']
+        if not isinstance(primary, dict) or set(primary) != {'path', 'region'} or not isinstance(primary['region'], dict):
+            raise SecurityGateError('CodeQL review lacks an exact primary location.')
+        sink = _review_path(primary['path'])
+        fingerprints = review['partial_fingerprints']
+        if not isinstance(fingerprints, dict) or not fingerprints or any(
+            not isinstance(k, str) or not isinstance(v, str) or not 0 < len(k) < 200 or not 0 < len(v) < 500
+            for k, v in fingerprints.items()):
+            raise SecurityGateError('CodeQL review requires the complete official partial fingerprints.')
+        dependencies = review['dependency_sha256']
+        if (not isinstance(dependencies, dict) or not PUBLIC_METADATA_GUARDS.issubset(dependencies)
+            or sink not in dependencies or len(dependencies) > 50):
+            raise SecurityGateError('CodeQL review must bind the sink, all sources and the public-key validators.')
+        for name, digest in dependencies.items():
+            if (not (_review_path(name).endswith('.py') or name == 'assets/update-channel.json')
+                or not re.fullmatch('[0-9a-f]{64}', str(digest))):
+                raise SecurityGateError('CodeQL review source identities are invalid.')
+        evidence = review['evidence']
+        if (not isinstance(evidence, dict) or not re.fullmatch('[0-9a-f]{64}', str(evidence.get('source_sarif_sha256', '')))
+            or not re.fullmatch('[0-9a-f]{40}', str(evidence.get('source_commit', '')))
+            or not re.fullmatch('[0-9]+', str(evidence.get('codeql_run', '')))):
+            raise SecurityGateError('CodeQL review lacks traceable original scan evidence.')
+        identity = _canonical_flow_json([review['rule_id'], primary, fingerprints, review['codeflows_sha256']])
+        if identity in seen:
+            raise SecurityGateError('Duplicate CodeQL public-metadata review.')
+        seen.add(identity)
+    return value['reviews']
+
+
+def _reviewed_codeql_entry(entry, reviews, root):
+    try:
+        primary = codeql_primary(entry)
+        digest = codeql_flow_digest(entry)
+        sources = set()
+        def collect(value):
+            if isinstance(value, dict):
+                if isinstance(value.get('artifactLocation'), dict):
+                    sources.add(_review_path(value['artifactLocation'].get('uri')))
+                for child in value.values():
+                    collect(child)
+            elif isinstance(value, list):
+                for child in value:
+                    collect(child)
+        collect(entry.get('codeFlows', []))
+        for review in reviews:
+            if (entry.get('ruleId') != review['rule_id'] or primary != review['primary_location']
+                or entry.get('partialFingerprints') != review['partial_fingerprints']
+                or digest != review['codeflows_sha256'] or len(entry.get('codeFlows', [])) != review['codeflow_count']
+                or not sources.issubset(review['dependency_sha256'])):
+                continue
+            valid = True
+            for name, expected in review['dependency_sha256'].items():
+                path = root / name
+                if (any(part.is_symlink() or part.is_junction() for part in (path, *path.parents))
+                    or not path.is_file() or not 0 < path.stat().st_size < 8 * 1024 * 1024):
+                    valid = False
+                    break
+                with path.open('rb') as handle:
+                    if hashlib.file_digest(handle, 'sha256').hexdigest() != expected:
+                        valid = False
+                        break
+            if valid:
+                return True
+    except (OSError, SecurityGateError, TypeError, ValueError):
+        pass
+    return False
+
+
+def scan_sarif(directory, *, root=ROOT, reviews_path=None):
+    root = Path(root)
+    reviews = _load_codeql_reviews(Path(reviews_path) if reviews_path else root / 'security/codeql-reviews.json')
     paths = sorted(Path(directory).glob('*.sarif'))
     if not paths:
         raise SecurityGateError('CodeQL produced no SARIF; absence of evidence is not a passed scan.')
-    findings = []
+    findings, reviewed = [], []
     runs_seen = 0
     for path in paths:
         if path.stat().st_size > 64 * 1024 * 1024:
@@ -135,6 +275,8 @@ def scan_sarif(directory):
             raise SecurityGateError('CodeQL SARIF has no valid analysis runs.')
         for run in document['runs']:
             runs_seen += 1
+            if 'diff-informed' in str(run.get('properties', {}).get('incrementalMode', '')).lower():
+                raise SecurityGateError('Diff-informed SARIF cannot certify a complete repository security scan.')
             if any(invocation.get('executionSuccessful') is False for invocation in run.get('invocations', [])):
                 raise SecurityGateError('CodeQL reported an unsuccessful analysis invocation.')
             for entry in run.get('results', []):
@@ -143,12 +285,14 @@ def scan_sarif(directory):
                 # Preserve useful repository locations, never host absolute paths or messages.
                 if uri.startswith(('/', '\\', 'file:')) or re.match(r'^[A-Za-z]:', uri):
                     uri = '<non-relative-location>'
-                findings.append(dict(rule_id=entry.get('ruleId', 'unknown'),
+                target = reviewed if _reviewed_codeql_entry(entry, reviews, root) else findings
+                target.append(dict(rule_id=entry.get('ruleId', 'unknown'),
                     level=entry.get('level', 'warning'), path=uri,
                     line=location.get('region', {}).get('startLine')))
     return dict(passed=not findings, tool='GitHub CodeQL', runs=runs_seen,
-        unresolved_findings=len(findings), blocking_policy='All unresolved CodeQL security findings block; no ignored rules.',
-        findings=findings)
+        total_findings=len(findings) + len(reviewed), reviewed_public_metadata=len(reviewed),
+        unresolved_findings=len(findings), blocking_policy='All unresolved findings block; only exact source-bound public metadata reviews, no ignored rules.',
+        findings=findings, reviewed_findings=reviewed)
 
 
 def workflow_policy(root=ROOT):
@@ -189,6 +333,8 @@ def workflow_policy(root=ROOT):
     if not all(name in triggers for name in ('push', 'pull_request', 'schedule', 'workflow_dispatch')):
         errors.append('security.yml: required continuous security triggers are missing')
     names = {job.get('name') for job in security.get('jobs', {}).values()}
+    if security.get('jobs', {}).get('codeql', {}).get('env', {}).get('CODEQL_ACTION_DIFF_INFORMED_QUERIES') != 'false':
+        errors.append('security.yml: CodeQL PR scans must disable diff-informed result filtering')
     if not set(CHECKS).issubset(names):
         errors.append('security.yml: required blocking security jobs are missing')
     ci = yaml.load((root / '.github/workflows/ci.yml').read_text('utf-8'), Loader=yaml.BaseLoader)

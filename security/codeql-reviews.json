@@ -1,0 +1,317 @@
+{
+  "schema_version": 1,
+  "canonicalization": "codeql-complete-flow-v1",
+  "reviews": [
+    {
+      "rule_id": "py/clear-text-storage-sensitive-data",
+      "classification": "reviewed_public_metadata",
+      "partial_fingerprints": {
+        "primaryLocationLineHash": "40d8ad0a4021eee7:1",
+        "primaryLocationStartColumnFingerprint": "13"
+      },
+      "codeflows_sha256": "9d7691a91e700e089d3be02056b210d26febaedb34ca94423c7199fb5e730161",
+      "codeflow_count": 4,
+      "dependency_sha256": {
+        "assets/update-channel.json": "fd817c8ecd76b8dc9a4e8f341c1ba649b83a5a4bd15ed6af90cf5ae562ceeea9",
+        "core/update_channel.py": "cdbf22f6a503795f30b2a07017e8b12b453f2a9a55c1f468f9562209a265cecb",
+        "core/update_manifest.py": "e043e5f1aba9b0a13334f58fb1f1b142e5ca7eca6dc05887bc8eb4cb95b327ed",
+        "scripts/configure_update_channel.py": "8da04df5cd7365eeb5f4ed78d70ee4d0234e15c7921dd5967717e3ce89357ad1",
+        "scripts/publish_release.py": "3efaf7b6e193c965f95c147886649567d21303f0c5e390bfcd55f89e09de1117",
+        "utils/build_info.py": "b4f485d86dc6ac924d85e6fedba8cc5c732feeae46578b2dce4961575465d38f"
+      },
+      "reason": "Only explicitly confirmed public verification material reaches this writer. configure requires the input object to contain only trusted_keys, validates exact Ed25519/RSA public field sets, confirms the public fingerprint, and validates the stable channel schema. Private fields and unknown fields are rejected; publishing public verification keys is required for client signature verification.",
+      "reviewed_by": "Codex exact source-to-sink public verification metadata review",
+      "primary_location": {
+        "path": "scripts/configure_update_channel.py",
+        "region": {
+          "startLine": 49,
+          "startColumn": 26,
+          "endColumn": 33
+        }
+      },
+      "evidence": {
+        "source_sarif_sha256": "da903b0f020b5f66e2bb4f8dd85fd750a09e1ce8790497eaf1c52b696471ef87",
+        "source_commit": "94cae998c5a0e5203d06d0274d6e2935c5e5f0d3",
+        "codeql_run": "40151743924",
+        "source_url": "https://github.com/xlxs123/MediaFlow/actions/runs/40151743924",
+        "original_primary_location": {
+          "path": "scripts/configure_update_channel.py",
+          "region": {
+            "startLine": 49,
+            "startColumn": 26,
+            "endColumn": 33
+          }
+        },
+        "public_contract_validation_sha256": "d7ba52e6ef1cf93a49e6c440b6ebf9a81538ea4585ff6cf884a50e24f23d5af9",
+        "public_contract_validation": "Private and unknown fields rejected; runtime identity exposes only public fingerprints, IDs and state.",
+        "mapped_by_unchanged_source_text": false
+      }
+    },
+    {
+      "rule_id": "py/clear-text-storage-sensitive-data",
+      "classification": "reviewed_public_metadata",
+      "partial_fingerprints": {
+        "primaryLocationLineHash": "431ec8cfbe0e6a87:1",
+        "primaryLocationStartColumnFingerprint": "37"
+      },
+      "codeflows_sha256": "6e4f0cf23fd874f7936ccdfc1167b6777170baf06dd1eaf3e74c50324a2616c5",
+      "codeflow_count": 4,
+      "dependency_sha256": {
+        "assets/update-channel.json": "fd817c8ecd76b8dc9a4e8f341c1ba649b83a5a4bd15ed6af90cf5ae562ceeea9",
+        "core/update_channel.py": "cdbf22f6a503795f30b2a07017e8b12b453f2a9a55c1f468f9562209a265cecb",
+        "core/update_manifest.py": "e043e5f1aba9b0a13334f58fb1f1b142e5ca7eca6dc05887bc8eb4cb95b327ed",
+        "main.py": "57a6b2818e780668c814406235dfe68b04dcb05ca0895c7d3cad1b7fe1685f15",
+        "utils/build_info.py": "b4f485d86dc6ac924d85e6fedba8cc5c732feeae46578b2dce4961575465d38f"
+      },
+      "reason": "runtime_identity publishes only public key IDs and SHA-256 public-key fingerprints under update_channel, plus non-secret build capabilities. Raw verification keys, private signing material, passwords and cookies are not included in this reported flow. The reported trusted_keys lookup is a name-based heuristic source, not confidential material.",
+      "reviewed_by": "Codex exact source-to-sink public verification metadata review",
+      "primary_location": {
+        "path": "main.py",
+        "region": {
+          "startLine": 77,
+          "startColumn": 50,
+          "endColumn": 55
+        }
+      },
+      "evidence": {
+        "source_sarif_sha256": "da903b0f020b5f66e2bb4f8dd85fd750a09e1ce8790497eaf1c52b696471ef87",
+        "source_commit": "94cae998c5a0e5203d06d0274d6e2935c5e5f0d3",
+        "codeql_run": "40151743924",
+        "source_url": "https://github.com/xlxs123/MediaFlow/actions/runs/40151743924",
+        "original_primary_location": {
+          "path": "main.py",
+          "region": {
+            "startLine": 77,
+            "startColumn": 50,
+            "endColumn": 55
+          }
+        },
+        "public_contract_validation_sha256": "d7ba52e6ef1cf93a49e6c440b6ebf9a81538ea4585ff6cf884a50e24f23d5af9",
+        "public_contract_validation": "Private and unknown fields rejected; runtime identity exposes only public fingerprints, IDs and state.",
+        "mapped_by_unchanged_source_text": false
+      }
+    },
+    {
+      "rule_id": "py/clear-text-storage-sensitive-data",
+      "classification": "reviewed_public_metadata",
+      "partial_fingerprints": {
+        "primaryLocationLineHash": "1687bda0d60d2acb:1",
+        "primaryLocationStartColumnFingerprint": "22"
+      },
+      "codeflows_sha256": "6343335a49c0b9b012a37e79fa232b41983c65e070cba95c696eb5e252932de9",
+      "codeflow_count": 4,
+      "dependency_sha256": {
+        "assets/update-channel.json": "fd817c8ecd76b8dc9a4e8f341c1ba649b83a5a4bd15ed6af90cf5ae562ceeea9",
+        "core/update_channel.py": "cdbf22f6a503795f30b2a07017e8b12b453f2a9a55c1f468f9562209a265cecb",
+        "core/update_manifest.py": "e043e5f1aba9b0a13334f58fb1f1b142e5ca7eca6dc05887bc8eb4cb95b327ed",
+        "tests/live_release_check.py": "114e98b6dab126f1703ab247cbf42aceaa25882e26f63c55d3eae3e21866f3c3",
+        "utils/build_info.py": "b4f485d86dc6ac924d85e6fedba8cc5c732feeae46578b2dce4961575465d38f"
+      },
+      "reason": "The reported flow is runtime_identity update_channel metadata placed in an acceptance report: public IDs and SHA-256 public-key fingerprints only. Its complete reported source set is constrained by the strict public-key and channel validators; no real credentials enter these CodeQL flows.",
+      "reviewed_by": "Codex exact source-to-sink public verification metadata review",
+      "primary_location": {
+        "path": "tests/live_release_check.py",
+        "region": {
+          "startLine": 122,
+          "startColumn": 27,
+          "endColumn": 91
+        }
+      },
+      "evidence": {
+        "source_sarif_sha256": "da903b0f020b5f66e2bb4f8dd85fd750a09e1ce8790497eaf1c52b696471ef87",
+        "source_commit": "94cae998c5a0e5203d06d0274d6e2935c5e5f0d3",
+        "codeql_run": "40151743924",
+        "source_url": "https://github.com/xlxs123/MediaFlow/actions/runs/40151743924",
+        "original_primary_location": {
+          "path": "tests/live_release_check.py",
+          "region": {
+            "startLine": 122,
+            "startColumn": 27,
+            "endColumn": 91
+          }
+        },
+        "public_contract_validation_sha256": "d7ba52e6ef1cf93a49e6c440b6ebf9a81538ea4585ff6cf884a50e24f23d5af9",
+        "public_contract_validation": "Private and unknown fields rejected; runtime identity exposes only public fingerprints, IDs and state.",
+        "mapped_by_unchanged_source_text": false
+      }
+    },
+    {
+      "rule_id": "py/clear-text-storage-sensitive-data",
+      "classification": "reviewed_public_metadata",
+      "partial_fingerprints": {
+        "primaryLocationLineHash": "d12a51094088fb42:1",
+        "primaryLocationStartColumnFingerprint": "19"
+      },
+      "codeflows_sha256": "7f35d4f4faccb44e9bf843c421f191e12f0e997a5d8181029905272e140b8574",
+      "codeflow_count": 4,
+      "dependency_sha256": {
+        "assets/update-channel.json": "fd817c8ecd76b8dc9a4e8f341c1ba649b83a5a4bd15ed6af90cf5ae562ceeea9",
+        "core/update_channel.py": "cdbf22f6a503795f30b2a07017e8b12b453f2a9a55c1f468f9562209a265cecb",
+        "core/update_manifest.py": "e043e5f1aba9b0a13334f58fb1f1b142e5ca7eca6dc05887bc8eb4cb95b327ed",
+        "tests/recovery_acceptance.py": "0ae51d80f3a7d757ea15d0531e9377c7021f64f364e8d784fb5ddaedb6cd59d1",
+        "utils/build_info.py": "b4f485d86dc6ac924d85e6fedba8cc5c732feeae46578b2dce4961575465d38f"
+      },
+      "reason": "The reported flow is runtime_identity public verification identity placed in the recovery acceptance report. The generic JSON writer is not declared universally safe; only every exact reported public-metadata flow is reviewed. The server-path repair leaves the writer unchanged, and all moved flow locations are mapped by identical source lines.",
+      "reviewed_by": "Codex exact source-to-sink public verification metadata review",
+      "primary_location": {
+        "path": "tests/recovery_acceptance.py",
+        "region": {
+          "startLine": 60,
+          "startColumn": 24,
+          "endColumn": 88
+        }
+      },
+      "evidence": {
+        "source_sarif_sha256": "da903b0f020b5f66e2bb4f8dd85fd750a09e1ce8790497eaf1c52b696471ef87",
+        "source_commit": "94cae998c5a0e5203d06d0274d6e2935c5e5f0d3",
+        "codeql_run": "40151743924",
+        "source_url": "https://github.com/xlxs123/MediaFlow/actions/runs/40151743924",
+        "original_primary_location": {
+          "path": "tests/recovery_acceptance.py",
+          "region": {
+            "startLine": 60,
+            "startColumn": 24,
+            "endColumn": 88
+          }
+        },
+        "public_contract_validation_sha256": "d7ba52e6ef1cf93a49e6c440b6ebf9a81538ea4585ff6cf884a50e24f23d5af9",
+        "public_contract_validation": "Private and unknown fields rejected; runtime identity exposes only public fingerprints, IDs and state.",
+        "mapped_by_unchanged_source_text": true,
+        "location_mapping_proof_sha256": "5b632b09390771badac9e8a5d785d2a466ddfb491243297f06e67c6002e15215",
+        "mapping_contract": "Only identical, contiguous source-line regions mapped from the historical analysis into the tests-only server-path repair; no new SARIF result is claimed."
+      }
+    },
+    {
+      "rule_id": "py/clear-text-storage-sensitive-data",
+      "classification": "reviewed_public_metadata",
+      "partial_fingerprints": {
+        "primaryLocationLineHash": "fa65adb4cdd94246:1",
+        "primaryLocationStartColumnFingerprint": "39"
+      },
+      "codeflows_sha256": "1841ef31287f770238568adbaa51871ed59551cdb4ffc777c654b5b65181a11f",
+      "codeflow_count": 4,
+      "dependency_sha256": {
+        "assets/update-channel.json": "fd817c8ecd76b8dc9a4e8f341c1ba649b83a5a4bd15ed6af90cf5ae562ceeea9",
+        "core/update_channel.py": "cdbf22f6a503795f30b2a07017e8b12b453f2a9a55c1f468f9562209a265cecb",
+        "core/update_manifest.py": "e043e5f1aba9b0a13334f58fb1f1b142e5ca7eca6dc05887bc8eb4cb95b327ed",
+        "tests/tool_startup_acceptance.py": "ed8d3488fbe447569d517cc8b0f946ba50b7120f51f44d8565b613a65fb250b3",
+        "utils/build_info.py": "b4f485d86dc6ac924d85e6fedba8cc5c732feeae46578b2dce4961575465d38f"
+      },
+      "reason": "The reported report field comes from runtime_identity and contains public verification IDs/fingerprints, not tool credentials or private signing material. This review does not waive other sources flowing into the generic report or JSON serializer.",
+      "reviewed_by": "Codex exact source-to-sink public verification metadata review",
+      "primary_location": {
+        "path": "tests/tool_startup_acceptance.py",
+        "region": {
+          "startLine": 182,
+          "startColumn": 48,
+          "endColumn": 96
+        }
+      },
+      "evidence": {
+        "source_sarif_sha256": "da903b0f020b5f66e2bb4f8dd85fd750a09e1ce8790497eaf1c52b696471ef87",
+        "source_commit": "94cae998c5a0e5203d06d0274d6e2935c5e5f0d3",
+        "codeql_run": "40151743924",
+        "source_url": "https://github.com/xlxs123/MediaFlow/actions/runs/40151743924",
+        "original_primary_location": {
+          "path": "tests/tool_startup_acceptance.py",
+          "region": {
+            "startLine": 182,
+            "startColumn": 48,
+            "endColumn": 96
+          }
+        },
+        "public_contract_validation_sha256": "d7ba52e6ef1cf93a49e6c440b6ebf9a81538ea4585ff6cf884a50e24f23d5af9",
+        "public_contract_validation": "Private and unknown fields rejected; runtime identity exposes only public fingerprints, IDs and state.",
+        "mapped_by_unchanged_source_text": false
+      }
+    },
+    {
+      "rule_id": "py/clear-text-storage-sensitive-data",
+      "classification": "reviewed_public_metadata",
+      "partial_fingerprints": {
+        "primaryLocationLineHash": "d4f30cd8b3b98cb8:1",
+        "primaryLocationStartColumnFingerprint": "13"
+      },
+      "codeflows_sha256": "8a441ac4fb6a68eb14e214ffddc2b16af3a3637926d27f8dc95f57eb873060e3",
+      "codeflow_count": 4,
+      "dependency_sha256": {
+        "assets/update-channel.json": "fd817c8ecd76b8dc9a4e8f341c1ba649b83a5a4bd15ed6af90cf5ae562ceeea9",
+        "core/update_channel.py": "cdbf22f6a503795f30b2a07017e8b12b453f2a9a55c1f468f9562209a265cecb",
+        "core/update_manager.py": "cf5ccd41b9bcbcdf7cc7978cfd30d3a710257b4fb2ff3b7d28cb85083d5284b8",
+        "core/update_manifest.py": "e043e5f1aba9b0a13334f58fb1f1b142e5ca7eca6dc05887bc8eb4cb95b327ed",
+        "utils/build_info.py": "b4f485d86dc6ac924d85e6fedba8cc5c732feeae46578b2dce4961575465d38f"
+      },
+      "reason": "load_settings and merge_keys persist public verification-key configuration needed for offline manifest verification. Both embedded and user-added maps pass validate_trusted_keys, which permits only public Ed25519 bytes or public RSA modulus/exponent and rejects private/unknown fields. This review applies only to the exact reported public-key flows, not every call to _atomic_json.",
+      "reviewed_by": "Codex exact source-to-sink public verification metadata review",
+      "primary_location": {
+        "path": "core/update_manager.py",
+        "region": {
+          "startLine": 98,
+          "startColumn": 22,
+          "endColumn": 102
+        }
+      },
+      "evidence": {
+        "source_sarif_sha256": "da903b0f020b5f66e2bb4f8dd85fd750a09e1ce8790497eaf1c52b696471ef87",
+        "source_commit": "94cae998c5a0e5203d06d0274d6e2935c5e5f0d3",
+        "codeql_run": "40151743924",
+        "source_url": "https://github.com/xlxs123/MediaFlow/actions/runs/40151743924",
+        "original_primary_location": {
+          "path": "core/update_manager.py",
+          "region": {
+            "startLine": 98,
+            "startColumn": 22,
+            "endColumn": 102
+          }
+        },
+        "public_contract_validation_sha256": "d7ba52e6ef1cf93a49e6c440b6ebf9a81538ea4585ff6cf884a50e24f23d5af9",
+        "public_contract_validation": "Private and unknown fields rejected; runtime identity exposes only public fingerprints, IDs and state.",
+        "mapped_by_unchanged_source_text": false
+      }
+    },
+    {
+      "rule_id": "py/clear-text-logging-sensitive-data",
+      "classification": "reviewed_public_metadata",
+      "partial_fingerprints": {
+        "primaryLocationLineHash": "474269724996997:1",
+        "primaryLocationStartColumnFingerprint": "6"
+      },
+      "codeflows_sha256": "15f8cf582732d4bd94a304010ec9c923d5b4843fa5bff282aab7e05c1f646483",
+      "codeflow_count": 4,
+      "dependency_sha256": {
+        "assets/update-channel.json": "fd817c8ecd76b8dc9a4e8f341c1ba649b83a5a4bd15ed6af90cf5ae562ceeea9",
+        "core/update_channel.py": "cdbf22f6a503795f30b2a07017e8b12b453f2a9a55c1f468f9562209a265cecb",
+        "core/update_manifest.py": "e043e5f1aba9b0a13334f58fb1f1b142e5ca7eca6dc05887bc8eb4cb95b327ed",
+        "main.py": "57a6b2818e780668c814406235dfe68b04dcb05ca0895c7d3cad1b7fe1685f15",
+        "utils/build_info.py": "b4f485d86dc6ac924d85e6fedba8cc5c732feeae46578b2dce4961575465d38f"
+      },
+      "reason": "runtime_identity publishes only public key IDs and SHA-256 public-key fingerprints under update_channel, plus non-secret build capabilities. Raw verification keys, private signing material, passwords and cookies are not included in this reported flow. The reported trusted_keys lookup is a name-based heuristic source, not confidential material.",
+      "reviewed_by": "Codex exact source-to-sink public verification metadata review",
+      "primary_location": {
+        "path": "main.py",
+        "region": {
+          "startLine": 79,
+          "startColumn": 19,
+          "endColumn": 24
+        }
+      },
+      "evidence": {
+        "source_sarif_sha256": "da903b0f020b5f66e2bb4f8dd85fd750a09e1ce8790497eaf1c52b696471ef87",
+        "source_commit": "94cae998c5a0e5203d06d0274d6e2935c5e5f0d3",
+        "codeql_run": "40151743924",
+        "source_url": "https://github.com/xlxs123/MediaFlow/actions/runs/40151743924",
+        "original_primary_location": {
+          "path": "main.py",
+          "region": {
+            "startLine": 79,
+            "startColumn": 19,
+            "endColumn": 24
+          }
+        },
+        "public_contract_validation_sha256": "d7ba52e6ef1cf93a49e6c440b6ebf9a81538ea4585ff6cf884a50e24f23d5af9",
+        "public_contract_validation": "Private and unknown fields rejected; runtime identity exposes only public fingerprints, IDs and state.",
+        "mapped_by_unchanged_source_text": false
+      }
+    }
+  ]
+}
