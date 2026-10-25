@@ -1,38 +1,47 @@
-# MediaFlow 自动化安全与供应链加固
+# MediaFlow 安全与供应链加固报告
 
-本报告随实现提交。远程运行及密码学证明只能在 GitHub Actions 实际运行后补充；本地检查不替代远程验收。正式稳定版本保持 2.1.0，本阶段不创建稳定 Release。
+验收日期：2026-10-25。实现验收快照为 [5470d7679f7f5356ee1fab1f33f959b87bf5d86c](https://github.com/xlxs123/MediaFlow/commit/5470d7679f7f5356ee1fab1f33f959b87bf5d86c)；后续报告提交不改变应用源摘要。
 
-## 实施范围
+## 实际完成
 
-- 独立安全工作流：默认分支推送、PR、每周一及手动触发；官方 Python CodeQL、完整解析依赖审计、完整 Git 历史及 index 秘密检测、工作流安全策略。
-- Actions 全部固定为经官方标签、提交及入口文件核对的完整 SHA；归档工具同时核验发布方归档摘要和实际二进制摘要。
-- Dependabot 定期提出 Python 与 Actions 更新 PR，无自动合并或正式签名权限。
-- Windows 构建后从实际 EXE、TOC、模块字节和 wheel RECORD 生成 CycloneDX 1.6 SBOM，并在独立环境执行官方 schema 校验。
-- 默认分支通过 Windows 构建、EXE 启动、结构及 SBOM 检查后，独立最小权限 Job 使用官方 Artifact Attestations 生成来源证明；PR 无证明写权限。
-- 正式发布器在读取保险库之前要求同一默认分支提交最新安全运行通过；消费构建时必须再通过官方 GitHub CLI 密码学验签，不把本地收据当作签名。
+独立 [安全工作流](.github/workflows/security.yml) 已在 PR 和默认分支实际运行，并配置每周一 01:23 UTC（北京时间 09:23）及手动触发。官方 CodeQL、实际解析依赖、完整 Git 历史/index 秘密检测及工作流语法/权限策略均作为阻断检查。Actions 全部固定经官方来源核验的完整 SHA；归档工具核验发布方归档及实际二进制摘要。
 
-## 本地实际证据
+PR 的 CodeQL 差异过滤已关闭，差异 SARIF 或重新开启差异配置均失败。7 个公开验证材料误报按全部数据流、位置、官方指纹、所有源码/验证器完整摘要精确审核，原始 SARIF 与 total/reviewed/unresolved 数量保留；没有整规则或目录忽略。
 
-- 初始 Git remote、默认分支、HEAD、干净工作区及完整历史均已检查，目标为 `xlxs123/MediaFlow`。
-- 原应用六个依赖 pin 未变；仅将构建 bootstrap pip 从 25.2 更新至 26.2，修复实际审计发现的六个 CVE；复审覆盖 15/15 个解析依赖，零漏洞、零漏包。
-- 完整历史秘密检测首轮命中逐项复核为合成测试夹具；原始失败报告保留，例外按不可变内容及具体位置绑定，不忽略整目录或官方提供商规则。
-- 实际 gitleaks 集成、依赖审计、SBOM 归档与篡改边界、独立 schema、来源证明门禁及原发布器增量测试已执行。完整回归的最终统计在远程验收补充前更新。
-- 本次开始时，原 2.0.0、2.0.1、2.1.0 既有文件保护清单共 1519 个文件、2509943319 字节，未发生变化；结束时重新核验。
+Dependabot 已覆盖 Python 与 Actions，按周检查、分组低风险更新，不自动合并。初始化的 [Python 检查](https://github.com/xlxs123/MediaFlow/actions/runs/40151749730) 与 [Actions 检查](https://github.com/xlxs123/MediaFlow/actions/runs/40151749736) 均在 GitHub 真实完成；它提出的依赖 PR 未被本任务擅自合并。
 
-## 远程验收状态
+Windows 实际构建在独立环境完成，生成实际归档/RECORD 支撑的 CycloneDX 1.6 SBOM；独立官方 schema 校验成功。默认分支专用 Job 使用 GitHub Artifact Attestations，对 EXE、收据、测试/结构报告及 SBOM 核心文件生成来源证明。此 Job 不 checkout 或执行项目命令，仅自身拥有 OIDC/attestation 写权限；普通 CI 没有生产私钥。
 
-首轮真实 [PR #1](https://github.com/xlxs123/MediaFlow/pull/1) 验收中，[Windows 构建](https://github.com/xlxs123/MediaFlow/actions/runs/40150391740) 已通过打包、实际 EXE 启动、更新/回退回归与 SBOM 校验。[安全工作流](https://github.com/xlxs123/MediaFlow/actions/runs/40150391793) 的依赖、完整历史秘密及策略检查通过；CodeQL 如实阻断两项发现，没有忽略规则。
+## 验证结果
 
-两项最小修复分别是 localhost HTTPS 夹具显式设定 TLS 1.2 下限，以及命名元数据提取使用精确域名/点边界子域判断。后者只调整命名来源判断，不改媒体发现或下载。相关 41 项增量及真实 TLSv1.3 证书校验握手通过。修复后的 CodeQL 和完整回归正在重新验证，不能提前计为通过。
+| 层次 | 实际结果 | 证据 |
+| --- | --- | --- |
+| 本地完整产品回归 | 2444 项，0 失败、0 错误、2 项明确跳过；37 个独立分组 | 本地报告摘要 `f01207a7fbb2a56e609294ce5c933e3bec27b4afaceba26b584eacc0877babca` |
+| 修复及安全边界增量 | 41 项 TLS/域名回归、24 项夹具/恢复边界、38 项契约/门禁等增量通过 | 各轮原报告保留，不累加为唯一测试数 |
+| GitHub 安全四项 | 全部通过；CodeQL 原始 7 / 已审核公开材料 7 / 未解决 0；依赖 15/15 零漏洞；秘密 0 阻断 | [真实运行](https://github.com/xlxs123/MediaFlow/actions/runs/40154064014) |
+| Windows 更新与发布回归 | 431 项，0 失败/错误/跳过；实际打包、EXE 启动及完整结构检查通过 | [真实运行](https://github.com/xlxs123/MediaFlow/actions/runs/40154064054) |
+| 独立下载后的 EXE | 官方构建产物大小/摘要、完整收据与 190 个文件核验；本机实际启动及结构复验通过 | [完整 Windows CI 产物](https://github.com/xlxs123/MediaFlow/actions/runs/40154064054/artifacts/12583722596) |
+| SBOM | 42 个实际组件、6 个构建工具；官方 1.6 schema 零错误，公开路径/摘要关系验证通过 | [SBOM](https://github.com/xlxs123/MediaFlow/actions/runs/40154064054/artifacts/12584415815) |
+| 密码学来源证明 | 官方 `gh attestation verify` 对 7 个实际对象逐项通过，限制仓库、工作流、默认分支、提交、run ID，并拒绝 self-hosted runner | [官方证明束](https://github.com/xlxs123/MediaFlow/actions/runs/40154064054/artifacts/12583448109) |
+| 发布失败边界 | 对真实失败的默认分支安全运行 40151743924 调用门禁，正确拒绝；未启动发布器或访问保险库 | 原失败记录与只读拒绝报告保留 |
 
-真实 Windows SBOM 已下载并独立复验，42 个实际组件、6 个构建工具，官方 schema 零错误。PR 来源证明按设计跳过；只有默认分支合入后实际生成并经 `gh attestation verify` 验证，才能报告密码学来源证明成功。
+本地两项跳过为：未指定专用 localhost 浏览器验收配置，以及本机无法创建符号链接。GitHub Windows 增量回归无跳过。本阶段没有重复下载真实网站样本，也没有读取实际浏览器登录资料。
 
-PR #1 已通过正常流程合入 `94cae998c5a0e5203d06d0274d6e2935c5e5f0d3`，未绕过保护。最终完整本地回归为 2444 项、0 失败/错误、2 项明确跳过。随后默认分支的完整 CodeQL 揭示此前 PR 的差异过滤盲区与额外 14 项，现关闭差异模式、强化本地验收资源边界，并对严格公钥契约的 7 个误报登记完整流/源码绑定审核。失败报告和原始 SARIF 均保留，待真实完整复验，不能提前声称全部通过。
+## 最小修复与发布保护
 
-只读保护复核通过：原 1519 个文件、2509943319 字节及 v2.1.0 的 13 个资产未变；匿名稳定清单与已验签原文件完全相同，原 4 个隔离验收 Release 仍保留。正式渠道、公钥、旧版和原用户数据未被迁移、清理或覆盖。
+实际依赖审计发现 pip 25.2 的六个已知 CVE，仅将构建 bootstrap 固定为 pip 26.2，原应用六个依赖 pin 不变，复审覆盖 15/15 且零漏洞。CodeQL 的 TLS 夹具和域名边界结果已修复；额外本地验收资源与响应头边界已收紧，媒体 ID 诊断排除认证字段及签名 URL。未修改下载核心、媒体评分、WebView2/CDP、任务恢复或媒体库运行逻辑。
 
-## 边界及使用
+正式发布前必须通过同一默认分支提交最新安全工作流，失败、跳过、缺失或超过八天均在访问正式保险库之前停止。消费构建还须官方密码学验签，不能用未签名本地收据替代；没有绕过开关。源码修改通过正常 [PR #1](https://github.com/xlxs123/MediaFlow/pull/1) 和 [PR #3](https://github.com/xlxs123/MediaFlow/pull/3) 合并，无强推或保护绕过。
 
-详见 [自动化安全说明](docs/SECURITY_AUTOMATION.md)、[扫描结果](SECURITY_SCAN_RESULTS.md) 与 [SBOM 验证](SBOM_VERIFICATION.md)。不读取用户浏览器配置、不迁移或清理媒体、不访问生产私钥、不修改正式更新源、公钥或既有发布资产。原下载核心、媒体评分和 UI 不在变更范围内。
+## 稳定版本及数据保护证据
 
-SBOM 对无法从实际构建证明版本和归属的原生/静态链接传递组件保留明确 incomplete 标记。CI 来源证明不等于发布者 Ed25519 签名或 Windows Authenticode。CI 证据有保留期限，下载可能要求 GitHub 登录。
+正式稳定版仍为 v2.1.0，Release ID 421736487。13 个资产的 ID、名称、大小、摘要和 URL 与任务开始记录完全一致。原 2.0.0、2.0.1、2.1.0 的 1519 个文件、2509943319 字节逐项摘要未变，4 个既有隔离验收 Release 保留。未发布新稳定版本，未删除、移动或清理旧版/用户文件。
+
+- 稳定清单：[固定地址](https://github.com/xlxs123/MediaFlow-Releases/releases/latest/download/manifest.json)；匿名重取 SHA-256 `580c204f3048c3443f51c6199ee25a62bb9f88d158cdced832bc41ae6632bf44`，与原已验签文件字节完全一致。
+- 客户端渠道/可信公钥配置 SHA-256：`fd817c8ecd76b8dc9a4e8f341c1ba649b83a5a4bd15ed6af90cf5ae562ceeea9`，未变。
+- 原正式包 SHA-256：`ab560859e0b7be22b5b2cfa2f50f9b3fc63c5489c2bd8c4246dd1c0e4b407b6c`，大小 371249271 字节，未变。
+- 正式源码标签对象仍为 `4f51a1866aeff9d8b74af0c4fd63b1c776de8cbd`，目标仍为 `4149abf52d522308bfeac9a6ab9e6d34a2e20d96`。
+
+## 使用及限制
+
+日常维护入口见 [SECURITY_AUTOMATION.md](docs/SECURITY_AUTOMATION.md)，精确文件清单见 [MODIFIED_FILES.txt](MODIFIED_FILES.txt)。CI 资产可能需要 GitHub 登录，SBOM/证明保留 30 天，完整构建保留 7 天。原生及静态链接传递组件未穷尽，SBOM 明确 incomplete；漏洞数据库不能覆盖未知漏洞。GitHub 来源证明不等于发布者 Ed25519 签名或 Windows Authenticode；本阶段不声明新增稳定发布或对 Windows EXE 完成 Authenticode 签名。
