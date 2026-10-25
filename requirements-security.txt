@@ -1,0 +1,5 @@
+# Isolated CI/audit tooling; never added to the application build environment.
+pip-audit==2.10.1
+jsonschema==4.26.0
+PyYAML==6.0.3
+cyclonedx-python-lib==11.12.0

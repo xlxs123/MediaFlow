@@ -202,5 +202,18 @@ class PublicSourceAuditTests(unittest.TestCase):
         self.assertIn('credential_literal', value)
 
 
+    def test_only_exact_security_policy_paths_are_allowed(self):
+        names = ['requirements-build.txt', 'requirements-security.txt', 'MODIFIED_FILES.txt',
+                 'security/dependency-policy.json', 'security/gitleaks.toml',
+                 'security/sbom-policy.json', 'security/secret-exceptions.json', 'security/toolchain.json']
+        for name in names:
+            self.file(name, 'public policy fixture\n')
+        self.assertTrue(audit(self.root, candidates=names)['passed'])
+        self.file('security/user-data.json', '{}')
+        result = audit(self.root, candidates=['security/user-data.json'])
+        self.assertFalse(result['passed'])
+        self.assertIn('outside_public_source_allowlist', [item['rule'] for item in result['findings']])
+
+
 if __name__ == '__main__':
     unittest.main()

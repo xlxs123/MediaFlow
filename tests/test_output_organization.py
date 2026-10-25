@@ -89,3 +89,13 @@ class OutputOrganizationTests(unittest.TestCase):
         self.assertEqual(values['id'], '7526879737634950451')
         self.assertEqual(values['site'], 'Douyin')
         self.assertEqual(make_values(media_id='https://secret.test/a?token=abc')['id'], '未知ID')
+
+    def test_bilibili_path_id_requires_exact_domain_or_subdomain(self):
+        for host in ('bilibili.com', 'www.bilibili.com', 'player.bilibili.com', 'WWW.BILIBILI.COM'):
+            with self.subTest(host=host):
+                values = make_values(source_url='https://' + host + '/video/BV123')
+                self.assertEqual(values['id'], 'BV123')
+        for host in ('notbilibili.com', 'bilibili.com.invalid', 'bilibili.com-attacker.invalid', 'bilibili.company'):
+            with self.subTest(host=host):
+                values = make_values(source_url='https://' + host + '/video/BV123')
+                self.assertEqual(values['id'], '未知ID')

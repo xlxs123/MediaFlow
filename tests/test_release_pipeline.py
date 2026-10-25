@@ -49,6 +49,7 @@ class FakeGitHub:
     def release(self,repo,version):
         return {'draft':False,'html_url':'https://github.com/'+repo+'/releases/tag/v'+version} if self.published else None
     def ci(self,*args,**kwargs):return {'passed':True,'scope':'synthetic unit fixture only'}
+    def security(self,*args,**kwargs):return {'passed':True,'scope':'synthetic unit fixture only'}
 
 
 class PipelineTests(unittest.TestCase):
@@ -99,6 +100,16 @@ class PipelineTests(unittest.TestCase):
         self.assertFalse(pipeline.report['remote_writes'])
         self.assertFalse(pipeline.report['production_chain_verified'])
         self.assertEqual(len(pipeline.runner.calls),3)
+
+    def test_failed_security_gate_stops_before_formal_vault_access(self):
+        pipeline=self.pipeline()
+        with patch.object(FakeGitHub,'security',return_value={'passed':False}), \
+                patch.object(p,'find_vault',side_effect=AssertionError('No vault access after failed security')):
+            with self.assertRaisesRegex(p.PipelineError,'安全工作流未通过'):
+                pipeline.run()
+        self.assertFalse(any('publisher_windows_vault.ps1' in argument for arguments,_,_ in pipeline.runner.calls for argument in arguments))
+        self.assertFalse(pipeline.report['remote_writes'])
+        self.assertFalse(pipeline.report['production_chain_verified'])
 
     def test_dryrun_has_no_publisher_tag_or_upload_commands(self):
         pipeline=self.pipeline()
@@ -216,7 +227,10 @@ class GitHubGateTests(unittest.TestCase):
         jobs={'jobs':[{'steps':[{'name':name,'conclusion':'success'} for name in (
             'Update, signature, deployment and rollback regression','Build an independent Windows folder',
             'Start the packaged EXE and check complete release structure','Bind passed CI checks to the complete build',
-            'Retain passed build and public summaries')]}]}
+            'Generate and independently validate actual-package SBOM',
+            'Retain passed build and public summaries',
+            'Attest actual EXE, byte-bound receipt and check reports',
+            'Retain official Sigstore verification bundle')]}]}
         if mutate:mutate(run,artifact,jobs)
         def api(path,**kwargs):
             if path.endswith('/jobs?per_page=100'):return jobs

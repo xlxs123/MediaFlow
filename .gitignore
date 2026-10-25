@@ -4,6 +4,7 @@ __pycache__/
 build/
 dist*/
 verification/
+.security-venv/
 native/webview2/.sdk/
 tools/*.exe
 tools/*.zip

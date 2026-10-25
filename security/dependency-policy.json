@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "pip-audit",
+    "version": "2.10.1",
+    "official_source": "https://github.com/pypa/pip-audit"
+  },
+  "vulnerability_service": "pypi",
+  "block_all_reported_vulnerabilities": true,
+  "block_unknown_severity": true,
+  "require_complete_environment_coverage": true,
+  "require_distinct_tool_environment": true,
+  "ignored_vulnerabilities": [],
+  "request_timeout_seconds": 20,
+  "process_timeout_seconds": 180
+}

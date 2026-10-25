@@ -1,0 +1,18 @@
+title = "MediaFlow full-history and exact-index secret gate"
+
+[extend]
+useDefault = true
+
+# No directory/rule allowlists, inline bypasses or repository baselines.
+# Exact reviewed synthetic exceptions are handled by the Python gate only.
+[[rules]]
+id = "mediaflow-credential-literal"
+description = "Literal credential assignments require an exact synthetic review"
+regex = '''(?i)(?:["']?(?:password|passwd|access_token|api_key|client_secret|cookie|authorization)["']?[\t ]*[:=][\t ]*)(?:["'])([^"'\r\n]{8,})(?:["'])'''
+secretGroup = 1
+
+[[rules]]
+id = "mediaflow-sensitive-url"
+description = "Signed and authorized media URLs must not enter public Git content"
+regex = '''(?i)[?&](?:token|signature|sign|x-amz-signature|x-amz-credential|mstoken|a_bogus|ac_signature)=([^\s"'<>\r\n&]{8,})'''
+secretGroup = 1

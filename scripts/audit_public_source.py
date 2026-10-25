@@ -27,8 +27,12 @@ SOURCE_DIRECTORIES = frozenset(('core', 'ui', 'utils', 'tests', 'scripts',
 TEXT_EXTENSIONS = frozenset(('.py', '.ps1', '.cmd', '.bat', '.cs', '.manifest',
     '.config', '.json', '.txt', '.md', '.yml', '.yaml', '.toml', '.cfg', '.ini', '.svg'))
 ROOT_NAMES = frozenset(('main.py', 'build.ps1', 'MediaFlow.spec',
-    'M3U8 Downloader.spec', 'LICENSE', 'requirements.txt', '.gitignore',
+    'M3U8 Downloader.spec', 'LICENSE', 'requirements.txt', 'requirements-build.txt',
+    'requirements-security.txt', 'MODIFIED_FILES.txt', '.gitignore',
     '.gitattributes', '.editorconfig'))
+PUBLIC_SECURITY_FILES = frozenset(('security/dependency-policy.json',
+    'security/gitleaks.toml', 'security/sbom-policy.json',
+    'security/secret-exceptions.json', 'security/toolchain.json'))
 PROHIBITED_DIRECTORIES = frozenset(('.git', '.venv', 'venv', '__pycache__',
     '.pytest_cache', '.mypy_cache', '.sdk', 'node_modules', 'browserprofile',
     'browserprofiles', 'ebwebview', 'userdata', 'user_data', 'downloads',
@@ -197,6 +201,8 @@ def _path_rule(name):
         return 'private_binary_media_or_state_file'
     if path.name.casefold().endswith(('.sqlite-wal', '.sqlite-shm', '.db-wal', '.db-shm')):
         return 'database_runtime_file'
+    if name in PUBLIC_SECURITY_FILES:
+        return ''
     if len(path.parts) == 1:
         if name in ROOT_NAMES or path.suffix.casefold() == '.md':
             return ''
