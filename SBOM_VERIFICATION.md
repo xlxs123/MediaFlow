@@ -1,34 +1,45 @@
-# SBOM 与来源证明验证
+# SBOM 与构建来源证明验证
 
-## 实现及真实边界
+验收日期：2026-10-25。实现验收快照为 [5470d7679f7f5356ee1fab1f33f959b87bf5d86c](https://github.com/xlxs123/MediaFlow/commit/5470d7679f7f5356ee1fab1f33f959b87bf5d86c)；后续报告提交不改变应用源摘要。
 
-标准为 CycloneDX 1.6。生成器依据当前构建的完整发布文件收据、PyInstaller Analysis/PYZ/PKG TOC、实际 EXE CArchive/PYZ、模块实际字节及 wheel RECORD 核实归属。构建环境安装列表不能冒充实际运行组件。
+## 实际 Windows 构建
 
-记录 CPython、实际打包的 Python 发行包、可识别原生文件、便携工具与版本、源码提交及 Actions run ID。仅构建工具列在 metadata.tools，未进入归档的依赖不列为运行时；PyInstaller 实际启动支持文件独立记录。无法穷尽的静态链接传递组件明确 incomplete；未知版本不猜测。本机绝对路径与用户数据不得进入输出。
+[真实 Windows CI](https://github.com/xlxs123/MediaFlow/actions/runs/40154064054) 完成 431 项更新/发布回归、实际 EXE 启动、完整结构及 SBOM 检查。独立下载的构建归档为 371376710 字节，服务端 SHA-256 为 `5b4af14a1e99d10dec1d5e5d3bba9d4e5c10e4e1fd6921e3963c7f4e7bbf220f`，逐字节核验一致。完整目录 190 文件、575824930 字节；下载的 EXE 又在本机实际启动并通过结构检查。
 
-独立固定版本 CycloneDX schema validator 同时验证官方严格 schema、明确的 1.6 版本、文件摘要和组件关系。生成失败、归档被篡改、证据不一致或泄漏本机路径均阻断。
+EXE 版本为 2.1.0，SHA-256 `d83f1c9513b5fd6df82127109c92d754bc578cc1b538fe7b6dffdcacfee66dcc`；这是独立 CI 构建，不是新的稳定 Release。应用源摘要 `7e90e8b99147efca69479f1b95b5da3f48b29a949f7f5d702713ae7b9e93c8c9` 与完整本地回归/当前源码一致。
 
-## 已执行的本地验证
+## SBOM 实测
 
-- 使用真实可执行归档、字节及 RECORD 的本地测试覆盖模块所有权、共享 namespace、未打包依赖、构建工具区分、收据和并发替换等边界。
-- 本地构造归档产生的 SBOM 已通过官方 1.6 schema；这是测试夹具，不能当作本次 Windows 产品构建。
-- 独立 validator 五项测试全部通过，覆盖有效清单、摘要一致但 schema 错误、摘要一致但泄漏路径、已有报告不覆盖，以及错误 specVersion。
+格式为 CycloneDX 1.6，实际组件 42、构建工具 6，独立官方严格 schema 校验零错误、公开路径/秘密标记零命中。完整归档、TOC、实际模块字节、wheel RECORD 和全发布收据支撑组件归属；安装包列表未被冒充运行时清单。仅构建工具放 metadata.tools；未进入实际归档的 pycparser 不列作运行时，PyInstaller 启动支持文件单独记录。
 
-## CI 产物及密码学证明
+[SBOM 资产](https://github.com/xlxs123/MediaFlow/actions/runs/40154064054/artifacts/12584415815) 的下载归档 SHA-256 为 `748e9848d098ae6e8286d2d3352c39119cbb193de36672463799b85e4a3faede`，大小 183284 字节，已独立核对服务端摘要。BOM SHA-256 `d910bd3df15c89bd763d9e49af34aa1f906af79b4fcde972343d72f38139f8b6`；inventory SHA-256 `2b140c5f908e05a496ff83a8a962035f8dbfcc9e410678d342b1f197a85d5e44`。原 CI 校验报告与本机独立校验一致，未改写原证据。
 
-Windows CI 在实际 EXE 启动及完整结构检查后生成 SBOM，独立保存 `mediaflow.cdx.json`、`inventory.json`、`generation.json`、`SHA256SUMS.txt` 和 `validation.json`。SBOM 与来源证明资产保留 30 天；完整 Windows 目录保留 7 天，可能需要 GitHub 登录下载。
+## 已实际验签的官方来源证明
 
-默认分支的官方证明 Job 仅使用固定官方下载/证明 Actions，不 checkout、不执行项目命令。证明覆盖 EXE、原收据、测试/结构报告及 SBOM 核心证据。它必须先依赖成功 Windows 构建，PR 不获得证明权限。
+[官方证明束](https://github.com/xlxs123/MediaFlow/actions/runs/40154064054/artifacts/12583448109) 已下载，大小 7334 字节，归档 SHA-256 `b8bc7fdbb058e8f73f08d2ec7d04e5bb5f5bc0ca52ffb3b40bc3903e75af9c6f`。官方 GitHub CLI 实际验证以下 7 个对象，全部通过；不是仅检查 Job 名称或比较普通 SHA-256。
 
-收据仍是未签名 JSON。后续必须用官方 `gh attestation verify` 限制源码仓库、工作流、默认分支、提交及托管 runner，进一步核对实际文件 SHA-256 与 run ID。只有该步骤成功才可报告密码学来源证明通过。生成文档内保守的 false 标记不会被事后伪造为验签成功。
+| 对象 | 实际 SHA-256 | 官方密码学验证 |
+| --- | --- | --- |
+| build-attestation.json | `b7587575ee58701b2bed06f82eafffbd4232b2cda5699c422394a552be74f37c` | 通过 |
+| MediaFlow.exe | `d83f1c9513b5fd6df82127109c92d754bc578cc1b538fe7b6dffdcacfee66dcc` | 通过 |
+| results.json | `1873cd0e71b40351ddbdafe6b4049b6e3fde2e79232a145de383b832405670fc` | 通过 |
+| release-structure.json | `a62f15fe0b2be1a4a4fc89900397b0d92c78cf4419ababd498da5a5a856e68df` | 通过 |
+| mediaflow.cdx.json | `d910bd3df15c89bd763d9e49af34aa1f906af79b4fcde972343d72f38139f8b6` | 通过 |
+| inventory.json | `2b140c5f908e05a496ff83a8a962035f8dbfcc9e410678d342b1f197a85d5e44` | 通过 |
+| validation.json | `105ddf557eca8a2aca6ba949de354310d4ccda0c5a1b4f61c2d1bcef82218bac` | 通过 |
 
-## 待实际运行后补充
+验签限制：仓库 `xlxs123/MediaFlow`、工作流 `.github/workflows/ci.yml`、默认分支 `refs/heads/main`、提交 `5470d7679f7f5356ee1fab1f33f959b87bf5d86c`、run ID `40154064054`、SLSA v1 predicate，并拒绝 self-hosted runner。另检查证书、已验证时间戳、确切 subject 摘要及调用运行 ID；验证后复核文件未变。
 
-首轮真实 [Windows CI](https://github.com/xlxs123/MediaFlow/actions/runs/40150391740) 已实际生成 [SBOM 资产](https://github.com/xlxs123/MediaFlow/actions/runs/40150391740/artifacts/12581959664)。下载后核对 GitHub 服务端归档大小及 SHA-256，再复制到独立复验目录执行官方 schema 和证据关系校验：42 个实际组件、6 个构建工具、schema 错误 0。原 CI 证据未改写。
+复核命令格式：
 
-- 对应源码为 PR 临时 merge commit `4048b07cd6a30288f5be6ce317c6a6a7e1583f61`。
-- 下载归档 SHA-256：`9de81d2b16c56e0ae75f1bb4856835a58a0f2c02666f8d91ac0cd5511b4a9b13`。
-- BOM SHA-256：`57dd144394e70022b6945bc8fb93664a9e8020a353e88b14b15780341e4d8e60`。
-- inventory SHA-256：`8ff74186794e7976cf88368199725e8b0c8ac6e088eaa7bb40105186f1b99181`。
+```powershell
+gh attestation verify <实际文件> --repo xlxs123/MediaFlow --signer-workflow xlxs123/MediaFlow/.github/workflows/ci.yml --source-ref refs/heads/main --source-digest 5470d7679f7f5356ee1fab1f33f959b87bf5d86c --deny-self-hosted-runners --predicate-type https://slsa.dev/provenance/v1 --format json
+```
 
-本次安全修复后的新快照仍需重新构建。PR 证明 Job 按设计跳过，密码学来源证明未计为成功；默认分支生成后的证明束、CLI 验签结果及最终 CI 链接将在实际完成后补充。
+生产发布器会执行同一官方验证，并在此之前验证 [同提交安全四项](https://github.com/xlxs123/MediaFlow/actions/runs/40154064014)。未签名 build-attestation.json 仍只作为字节绑定收据；其外部官方证明独立核验。SBOM/生成阶段保守的 provenance=false 标记未被事后改写，真实验证结果由外部验签记录给出。
+
+## 证据层次及限制
+
+本地合成归档/schema/篡改测试仅算本地测试。本报告的 42 组件与七对象验签来自上述真实 GitHub 默认分支构建和独立下载复核；PR 阶段证明按设计跳过。
+
+FFmpeg、Qt、OpenSSL、yt-dlp 等原生或静态链接传递组件未全部枚举，composition 明确 incomplete；未知版本保持未知。外部系统 WebView2 Runtime 不冒充内置组件。GitHub 来源证明不等于发布者 Ed25519 签名或 Windows Authenticode。SBOM/证明保留30天，完整CI构建7天，下载可能要求GitHub登录；本机原始证据另行保留。
