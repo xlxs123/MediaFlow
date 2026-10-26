@@ -53,4 +53,25 @@ FFmpeg、Qt、OpenSSL、yt-dlp 等静态链接依赖无法全部从 PE 导入表
 
 本地已通过 21 项 native/schema 增量、14 项原 CArchive/PYZ/RECORD 回归及 3 项最新生成器集成检查，均零跳过；这些轮次不累加为唯一测试总数。实际只读 native probe 及其独立 schema/闭合校验已通过。
 
-新完整 Windows 构建、完整本地回归、远程 GitHub CI、更新/回滚回归和官方新来源证明仍待本阶段实际运行后补充。正式 Authenticode / 正式发布未完成的原因是生产证书未配置，不以本地模拟替代。
+完整本地回归已运行 2507 项，零失败/错误、2 项有明确环境原因的跳过；后续增量和源码/工作流审查另有验证。远程主分支实际运行 482 项更新/签名/部署/回滚回归，零失败、零错误、零跳过，并构建和启动真实 EXE。正式 Authenticode / 正式发布未完成的原因是生产证书未配置，不以本地模拟替代。
+
+## 新完整构建与独立公网复核
+
+[主分支 Windows 构建](https://github.com/xlxs123/MediaFlow/actions/runs/40273082480) 对应 `b806c405b612c9fb31bd49247c60378a663451d5`，实际通过独立 schema 校验、SDK 集成、EXE 启动和完整结构验证。新完整 SBOM 为 **457 个组件、6 个构建工具**；440 个实际 PE 中 8 个为物理文件、432 个位于两个已完整检查的 CArchive，原生未解析数和未检查归档数均为 0。此处 457 是完整 BOM 数量，与前文旧构建 native-only 探针的 447 不同。
+
+3620 条原生关系中：1615 条关联已分发对象、1841 条为外部系统依赖、163 条因同名对象保持歧义、1 条未解析为 `MediaFlow.exe!/PySide6/Qt6Core.dll` 的 `icuuc.dll` 导入。73 项版本资源缺口与 3 项 CLR 引用缺口继续保留；这些类别的 240 个缺口不等于漏洞数量。静态传递依赖仍明确 incomplete。
+
+从 [实际 SBOM 资产](https://github.com/xlxs123/MediaFlow/actions/runs/40273082480/artifacts/12629685999) 下载 489551 字节归档，服务器与本机 SHA-256 均为 `e5cdcdee5f01408aabcd9c0cb3ebf03b8f62686c096beb2fa60d70d186d0a25c`。本机独立重新计算摘要并执行官方严格 schema 与原生闭合验证，零 schema 错误、主机路径/秘密标记零命中，未改写 CI 原始 validation 文件。
+
+| 证据 | SHA-256 |
+| --- | --- |
+| mediaflow.cdx.json | `042e674ee3488cfa7c368a79b1d65e2763752fc9cee7a7dae63fce7f4d7f5add` |
+| inventory.json | `a79430512a539c7c1e9eef276ae25d9f92390a09e765c6fd34fe63e4f86d41ed` |
+| generation.json | `fa1278a3536a5c5a70fcd410a194aea4ee6c7bc54039d7fa3547ecf8daa52bc7` |
+| validation.json | `03e618b77b4c1ede6d65b43aa42991387f386944b2dcf7b4eb89a1e81f5edc61` |
+
+四个对象均已通过官方 GitHub CLI 的真实来源证明验证，绑定同一提交、主分支、工作流、运行 ID 和 GitHub 托管环境。全部证明对象共 10 个；本地收据或普通 SHA-256 没有被冒充为签名。普通 CI 保持未正式签名，不将上述 unsigned BOM 伪称为正式签后发行包的证明。
+
+完整构建 CI 资产保留 7 天，SBOM/证明 bundle 保留 30 天，GitHub 资产下载可能需要登录；本机保留本次下载的原始字节和验证结果。首次 CI 的环境依赖问题与精确审查绑定问题已修正，原失败运行及报告未删除。
+
+本机额外只读发布演练尚未完成：补齐固定扫描器路径后，本地增量测试组达到 900 秒上限而被安全阻断；未掩盖为通过，也没有删除原记录。该限制与已实际成功的远程构建、482 项回归、SBOM 独立校验和 10 对象来源验签分别报告。
