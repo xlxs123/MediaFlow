@@ -121,6 +121,15 @@ class PublicSourceAuditTests(unittest.TestCase):
         result = audit(self.root, candidates=['core/source.py'])
         self.assertIn('non_text_source', [item['rule'] for item in result['findings']])
 
+    def test_exact_public_signing_and_native_evidence_names_only(self):
+        for name in ('security/authenticode-policy.json',
+                     'security/native-component-evidence.json'):
+            self.file(name, '{"schema_version":1}\n')
+            self.assertTrue(audit(self.root, candidates=[name])['passed'])
+        name = 'security/unreviewed-signing-state.json'
+        self.file(name, '{}\n')
+        self.assertFalse(audit(self.root, candidates=[name])['passed'])
+
     def test_only_bounded_application_icon_is_allowed(self):
         self.file('assets/app.ico', b'\0\0\1\0unit-icon')
         self.assertTrue(audit(self.root, candidates=['assets/app.ico'])['passed'])

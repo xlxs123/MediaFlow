@@ -119,7 +119,9 @@ class PipelineTests(unittest.TestCase):
         for flag in ('published','published_by_this_run','remote_writes','production_chain_verified','public_online_verified'):
             self.assertFalse(result[flag])
         self.assertFalse(result['write_plan']['executed'])
-        self.assertTrue(any(stage=='formal-vault-check' for _,stage,_ in pipeline.runner.calls))
+        self.assertFalse(any(stage=='formal-vault-check' for _,stage,_ in pipeline.runner.calls))
+        self.assertFalse(result['production_ready'])
+        self.assertEqual(result['dry_run_level'],'unsigned-build-and-native-sbom')
         self.assertFalse(any('push' in args or 'upload' in args or 'edit' in args for args,_,_ in pipeline.runner.calls))
         self.assertTrue(all(not logs for _,stage,logs in pipeline.runner.calls if stage=='formal-vault-check'))
 
@@ -146,10 +148,18 @@ class PipelineTests(unittest.TestCase):
             'release_directory':str(self.old),'events':[],'published':False}
         (directory/'report.json').write_text(json.dumps(data),'utf-8')
         args=self.args();args.resume=True;args.run_directory=str(directory)
+        args.certificate_thumbprint='A'*40;args.timestamp_url='https://timestamp.unit.invalid'
+        args.security_python=sys.executable
         pipeline=p.Pipeline(args,root=self.root,runner_factory=FakeRunner,github_factory=FakeGitHub)
-        with patch.object(pipeline,'publish',side_effect=AssertionError('No upload')):
+        with patch.object(pipeline,'publish',side_effect=AssertionError('No upload')), \
+                patch.object(p,'authenticode',return_value={'passed':True,'configuration_only':True,'formal_verified':False}):
             with self.assertRaisesRegex(p.PipelineError,'发生变化'):pipeline.run()
         self.assertEqual((signed/'release.json').read_bytes(),b'changed')
+
+    def test_unsigned_readonly_dryrun_cannot_mislabel_an_old_signed_resume_checkpoint(self):
+        args=self.args();args.resume=True
+        with self.assertRaisesRegex(p.PipelineError,'没有签名恢复点'):
+            p.Pipeline(args,root=self.root,runner_factory=FakeRunner,github_factory=FakeGitHub)
 
     def test_existing_run_lock_does_not_get_removed_by_a_second_process(self):
         pipeline=self.pipeline()
@@ -227,6 +237,8 @@ class GitHubGateTests(unittest.TestCase):
         jobs={'jobs':[{'steps':[{'name':name,'conclusion':'success'} for name in (
             'Update, signature, deployment and rollback regression','Build an independent Windows folder',
             'Start the packaged EXE and check complete release structure','Bind passed CI checks to the complete build',
+            'Inspect unsigned application and preserved third-party signatures',
+            'Exercise isolated test-certificate signing and rejection paths',
             'Generate and independently validate actual-package SBOM',
             'Retain passed build and public summaries',
             'Attest actual EXE, byte-bound receipt and check reports',

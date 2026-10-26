@@ -27,7 +27,8 @@ GROUPS = {
              'test_public_source_audit', 'test_release_structure', 'test_github_publisher',
              'test_ci_build_receipt', 'test_release_pipeline', 'test_accept_release_update',
              'test_dependency_audit', 'test_secret_scan', 'test_sbom', 'test_security_gate', 'test_security_tools',
-             'test_codeql_reviews', 'test_fixture_security', 'test_public_metadata_contract'],
+             'test_codeql_reviews', 'test_fixture_security', 'test_public_metadata_contract',
+             'test_authenticode', 'test_release_security', 'test_native_sbom', 'test_sbom_validation'],
     'ui': ['test_update_ui'],
     'output': ['test_output_integration'],
 }

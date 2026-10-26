@@ -32,7 +32,8 @@ ROOT_NAMES = frozenset(('main.py', 'build.ps1', 'MediaFlow.spec',
     '.gitattributes', '.editorconfig'))
 PUBLIC_SECURITY_FILES = frozenset(('security/dependency-policy.json',
     'security/gitleaks.toml', 'security/sbom-policy.json',
-    'security/secret-exceptions.json', 'security/toolchain.json', 'security/codeql-reviews.json'))
+    'security/secret-exceptions.json', 'security/toolchain.json', 'security/codeql-reviews.json',
+    'security/authenticode-policy.json', 'security/native-component-evidence.json'))
 PROHIBITED_DIRECTORIES = frozenset(('.git', '.venv', 'venv', '__pycache__',
     '.pytest_cache', '.mypy_cache', '.sdk', 'node_modules', 'browserprofile',
     'browserprofiles', 'ebwebview', 'userdata', 'user_data', 'downloads',

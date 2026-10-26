@@ -287,7 +287,8 @@ def publish_release(release_dir, output_dir, *, package_url, published_at, key_i
                     trusted_keys_file, acceptance_receipt, private_key_file=None,
                     private_key_env=None, password=None, password_env=None,
                     release_notes='', release_page='', minimum_app_version='1.9.0',
-                    package_name=None):
+                    package_name=None, certificate_thumbprint='', certificate_store='CurrentUser',
+                    timestamp_url='', sign_tool_path='', pwsh=None):
     """Return verified artifacts. No server request, executable run or upload occurs."""
     release = _plain(release_dir).resolve()
     output = _plain(output_dir).resolve()
@@ -303,6 +304,17 @@ def publish_release(release_dir, output_dir, *, package_url, published_at, key_i
     keys = _trusted_keys(trusted_keys_file, release, output)
     if key_id not in keys or keys[key_id]['algorithm'] != 'ed25519':
         raise PublishError('独立可信公钥文件未包含所选 Ed25519 key_id。')
+    # The real application trust root is never treated as a disposable test key.
+    # Check native signatures before loading its private Ed25519 key. Local
+    # ephemeral-key fixtures remain isolated from the installed stable channel.
+    from scripts.release_security import official_publisher_key, verify_release, ReleaseSecurityError
+    native = None
+    if official_publisher_key(keys, key_id):
+        try:
+            native = verify_release(release, output.parent, thumbprint=certificate_thumbprint,
+                store=certificate_store, timestamp_url=timestamp_url, sign_tool=sign_tool_path, pwsh=pwsh)
+        except ReleaseSecurityError as error:
+            raise PublishError(str(error)) from None
     key = _private_key(private_key_file=private_key_file, private_key_env=private_key_env,
         password=password, password_env=password_env, blocked=(release, output))
     public = base64.b64encode(key.public_key().public_bytes(
@@ -339,6 +351,13 @@ def publish_release(release_dir, output_dir, *, package_url, published_at, key_i
         outer['package'] = {'format': 'zip', 'url': package_url, 'size': result['size'], 'sha256': result['sha256']}
         outer = _sign(outer, key, key_id)
         verified = validate_manifest(outer, keys, require_signature=True)
+        if native:
+            signed_files = {item['path']: item for item in outer['files']}
+            for item in native['files']:
+                if item['ownership'] == 'first_party' and (
+                        signed_files.get(item['path'], {}).get('sha256') != item['after_sha256']
+                        or _file_hash(release / item['path']) != item['after_sha256']):
+                    raise PublishError('正式代码签名验证后的 PE 在打包期间变化，已停止签署更新清单。')
         if not verified['authenticated']:
             raise PublishError('独立可信公钥自验签未通过，未提交发布文件。')
         _save_new(staging / 'release.json', _json(outer))
@@ -360,6 +379,7 @@ def publish_release(release_dir, output_dir, *, package_url, published_at, key_i
             'metadata_path': str(output / Path(result['metadata_path']).name),
             'size': result['size'], 'sha256': result['sha256'], 'exe_sha256': executable_sha,
             'manifest_sha256': verified['manifest_sha256'], 'authenticated': True,
+            'authenticode_formal_verified': native is not None,
             'authentication': verified['authentication'], 'key_id': key_id,
             'acceptance_receipt_sha256': receipt_sha, 'acceptance_reports': len(receipt['reports']),
             'package_url': package_url, 'uploaded': False, 'manifest': outer}
@@ -422,6 +442,11 @@ def main(argv=None):
     publish.add_argument('--release-page', default='')
     publish.add_argument('--minimum-app-version', default='1.9.0')
     publish.add_argument('--package-name')
+    publish.add_argument('--certificate-thumbprint', default='')
+    publish.add_argument('--certificate-store', choices=('CurrentUser', 'LocalMachine'), default='CurrentUser')
+    publish.add_argument('--timestamp-url', default='')
+    publish.add_argument('--sign-tool-path', default='')
+    publish.add_argument('--pwsh', default='')
     key = commands.add_parser('init-key', help='仅用户明确调用时在外部目录创建加密 Ed25519 私钥')
     key.add_argument('--directory', required=True)
     key.add_argument('--key-id', required=True)
@@ -445,7 +470,9 @@ def main(argv=None):
                     acceptance_receipt=args.acceptance_receipt, private_key_file=args.private_key_file,
                     private_key_env=args.private_key_env, password=password, password_env=args.password_env,
                     release_notes=args.notes, release_page=args.release_page,
-                    minimum_app_version=args.minimum_app_version, package_name=args.package_name)
+                    minimum_app_version=args.minimum_app_version, package_name=args.package_name,
+                    certificate_thumbprint=args.certificate_thumbprint, certificate_store=args.certificate_store,
+                    timestamp_url=args.timestamp_url, sign_tool_path=args.sign_tool_path, pwsh=args.pwsh or None)
         print(json.dumps({key: value for key, value in result.items() if key != 'manifest'}, ensure_ascii=False, indent=2))
         return 0
     except (PublishError, PackageError, UpdateValidationError) as error:

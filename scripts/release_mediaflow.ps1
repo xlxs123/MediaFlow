@@ -26,7 +26,12 @@ param(
     [ValidateRange(1,3600)][int]$CiWaitSeconds = 1200,
     [string]$ReleaseNotesFile = '',
     [string[]]$AdditionalAssets = @(),
-    [string]$MinimumAppVersion = '2.0.1'
+    [string]$MinimumAppVersion = '2.0.1',
+    [string]$CertificateThumbprint = '',
+    [ValidateSet('CurrentUser','LocalMachine')][string]$CertificateStore = 'CurrentUser',
+    [string]$TimestampUrl = '',
+    [string]$SignToolPath = '',
+    [string]$SecurityPython = ''
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -36,7 +41,7 @@ $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 if (-not $Python) { $Python = Join-Path $root '.venv\Scripts\python.exe' }
 if (-not (Test-Path -LiteralPath $Python -PathType Leaf)) { throw 'Python environment is unavailable; specify -Python.' }
 if ($TestRelease) {
-    if ($Resume -or $VaultDirectory -or $KeyId -or $ExistingReleaseDirectory -or $AcceptanceReports.Count -or $AdditionalAssets.Count) {
+    if ($Resume -or $VaultDirectory -or $KeyId -or $ExistingReleaseDirectory -or $AcceptanceReports.Count -or $AdditionalAssets.Count -or $CertificateThumbprint -or $TimestampUrl -or $SignToolPath) {
         throw 'TestRelease mirrors existing signed content only. Resume a remote draft with the same TestTag and a new RunDirectory.'
     }
     $testArguments = @('-X','utf8','-B',(Join-Path $PSScriptRoot 'release_test_transaction.py'),'publish',
@@ -53,12 +58,13 @@ if ($TestRelease) {
 $arguments = @('-X','utf8','-B',(Join-Path $PSScriptRoot 'release_pipeline.py'),'run',
     '--version',$Version,'--mode',$(if ($DryRun) {'dry-run'} else {'publish'}),
     '--pwsh',(Join-Path $PSHOME 'pwsh.exe'),'--ci-wait-seconds',[string]$CiWaitSeconds,
-    '--minimum-app-version',$MinimumAppVersion)
+    '--minimum-app-version',$MinimumAppVersion,'--certificate-store',$CertificateStore)
 foreach ($pair in @(
     @('--gh',$Gh), @('--vault-directory',$VaultDirectory), @('--key-id',$KeyId),
     @('--run-directory',$RunDirectory), @('--existing-release-dir',$ExistingReleaseDirectory),
     @('--old-release-dir',$OldReleaseDirectory), @('--ci-run-id',$CiRunId),
-    @('--release-notes-file',$ReleaseNotesFile))) {
+    @('--release-notes-file',$ReleaseNotesFile), @('--certificate-thumbprint',$CertificateThumbprint),
+    @('--timestamp-url',$TimestampUrl), @('--sign-tool-path',$SignToolPath), @('--security-python',$SecurityPython))) {
     if ($pair[1]) { $arguments += @($pair[0],$pair[1]) }
 }
 foreach ($report in $AcceptanceReports) { $arguments += @('--acceptance-report',$report) }

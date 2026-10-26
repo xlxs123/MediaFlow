@@ -58,3 +58,11 @@ python scripts/audit_dependencies.py --environment-python <构建Python> --audit
 新 CI 构建消费路径先核验下载资产的服务端摘要、完整收据，再进行官方来源证明验证。正式模式复用已有目录时，还必须具有原 CI 的相邻收据及对应密码学证明；仅本地 EXE 验收不足以替代。旧目录复用的 DryRun 保留原验收边界，不会被当作新的正式构建来源证明。
 
 生产私钥始终留在发布者现有保险库，不进入任何普通或安全 CI。该系统不修改稳定更新地址、可信公钥、旧版资产或用户数据，不发布新稳定版本，也不执行静默删除。
+
+## Authenticode 与原生组件增量
+
+Windows CI 在不接触正式密钥的普通 Job 中检查真实 unsigned PE/第三方原签名，并用非导出、未受正式信任的短期 TEST ONLY 证书执行签名/篡改/拒绝回归；Root 信任库保持不变。正式签名仅由独立本地发布入口在配置真实代码证书后执行，Ed25519 继续独立保护更新清单。
+
+原生 BOM 以真实物理文件及两个 CArchive 为依据，记录导入和延迟导入关系、版本和许可证据、system prerequisites 与明确缺口。新 CI 强制 `--require-native`；旧 schema 1 不会被当成原生扫描通过。官方 provenance 额外绑定 generation 和 Authenticode 安全摘要，仍仅由默认分支无项目命令的特权 Job 创建。
+
+结果及证据层次分别见 [Authenticode](../AUTHENTICODE_VERIFICATION.md)、[SBOM 覆盖](../SBOM_COVERAGE_REPORT.md)。本地签后 BOM 是受限制的独立派生，不冒称被原 CI attestation 签署；普通 SHA-256 不等于数字签名。
