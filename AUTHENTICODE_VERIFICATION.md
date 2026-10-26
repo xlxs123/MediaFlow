@@ -50,7 +50,7 @@ RFC3161 不仅检查 OID。使用完整 `TryDecode` 和 [`VerifySignatureForSign
 | 生产证书签名 | **未完成：证书未配置** | 不以自签证书或 Microsoft 工具签名冒充 MediaFlow 正式签名 |
 | 完整本地回归 | 2507 项，0 失败、0 错误、2 跳过 | 未提供专用 localhost 浏览器样本与当前用户无符号链接权限；后续源码披露增量测试另行通过 |
 | 更新/部署/回滚聚焦回归 | 481 项，0 失败/错误，1 个符号链接权限跳过 | 核心、UI、输出均通过；源码审查与工作流变更另有增量测试 |
-| 远程 GitHub CI | 待实际运行 | 后续记录实际运行链接，不以本地结果替代 |
+| 远程主分支 CI | 482 项更新/签名/部署/回滚回归，零失败、零错误、零跳过；SDK 集成 10/10 | 实际 Windows x64 构建、EXE 启动、190 文件结构与 SBOM 校验通过 |
 
 合法测试签名保持 `0x800B0109`（不受正式信任）；签后篡改实际得到 HashMismatch / `0x80096010`。原 PE 与 Root 信任库未变，测试私钥不可导出。全部失败及通过记录保留。
 
@@ -59,3 +59,17 @@ RFC3161 不仅检查 OID。使用完整 `TryDecode` 和 [`VerifySignatureForSign
 发行者需自行提供合法 CA 签发并正确安装的代码签名证书/硬件密钥，以及确认的 HTTPS RFC3161 服务；只需配置公开 thumbprint、存储位置和服务 URL，不向聊天、仓库或普通 CI 提供私钥或密码。未擅自购买证书、初始化生产私钥或修改信任根。
 
 代码签名有效也不保证 SmartScreen 不提示。普通 CI 的未签名构建、测试证书集成、真实正式证书签名与正式稳定发布是四个不同证据层次。
+
+## 已完成的远程验收
+
+实现通过 [PR #5](https://github.com/xlxs123/MediaFlow/pull/5) 正常合并，构建提交为 `b806c405b612c9fb31bd49247c60378a663451d5`。[Windows CI](https://github.com/xlxs123/MediaFlow/actions/runs/40273082480) 与 [安全工作流](https://github.com/xlxs123/MediaFlow/actions/runs/40273082383) 实际成功。CodeQL 未处理告警为 0；公开公钥写入的原完整四条数据流经重新复核，只更新改变的发布脚本摘要绑定。
+
+GitHub Windows SDK SignTool 为 `10.0.26100.7705`，Microsoft 原签名 Valid。远程 TEST ONLY 集成 10/10，原三个 PE 与 Root 信任库保持不变，未导出测试私钥，正式证书状态仍为 `not_configured`。
+
+从真实 GitHub API 下载 371381083 字节构建归档，SHA-256 为 `997857b605cdc1b6235256ccdd7efba54e174247e1e3eecd38238aabd21d3cb6`，与服务器摘要一致。下载后实际 EXE 再次启动并通过 190 文件结构检查。
+
+使用官方 GitHub CLI，对同一提交、主分支、实际运行 ID、固定工作流及 GitHub 托管 runner 条件下的 10 个对象分别验证 OIDC/Sigstore/SLSA 来源证明：主 EXE、全文件构建收据、回归结果、结构报告、四份 SBOM 证据、两份 Authenticode 检查报告。它们均通过；这不是 Windows Authenticode 或发行者 Ed25519 签名。
+
+只读 DryRun **未完成**：首次误用工作区外的运行目录被路径门禁拒绝；随后遗漏本地 MEDIAFLOW_GITLEAKS 配置导致真实扫描用例被跳过并阻断，已补上固定版本工具路径；下一轮本机增量组运行到 900 秒上限而停止，具体耗时原因尚未查明。没有跳过检查、增加超时或继续签署/发布，全部失败记录保留。同一实现的远程 482 项回归和独立下载复核已通过，不能以此冒充本机完整 DryRun 通过。无证书条件下，正式生产签名/发布仍未验收。
+
+正式 v2.1.0 的 13 个资产 ID、大小、摘要与地址均未变；匿名稳定清单 SHA-256 保持 `580c204f3048c3443f51c6199ee25a62bb9f88d158cdced832bc41ae6632bf44`，更新配置 SHA-256 保持 `fd817c8ecd76b8dc9a4e8f341c1ba649b83a5a4bd15ed6af90cf5ae562ceeea9`，源码 v2.1.0 标签对象未变。旧源码/发布基线的 1519 个文件完整摘要未变。没有发布新稳定版本，没有清理用户文件；失败记录继续保留。
