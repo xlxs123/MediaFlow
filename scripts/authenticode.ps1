@@ -215,10 +215,17 @@ try{
     $references=@(Get-ChildItem -LiteralPath (Join-Path $PSHOME 'ref') -Filter '*.dll' -File|ForEach-Object FullName)+[Security.Cryptography.Pkcs.SignedCms].Assembly.Location
     Add-Type -Path (Join-Path $PSScriptRoot 'authenticode_native.cs') -ReferencedAssemblies $references
     if(-not $ReleaseDirectory){
+        $script:result.configuration_only=$true
+        $script:result.private_key_operation_tested=$false
+        $script:result.timestamp_service_protocol_tested=$false
+        $script:result.timestamp_service_status='not_configured'
         $script:stage='tool';Discover-SignTool
         $script:stage='certificate';$certificate=Select-Certificate
-        if($Mode -eq 'Production'){Assert-Timestamp}
-        $script:result.configuration_only=$true;$script:result.passed=$true
+        if($Mode -eq 'Production' -or $TimestampUrl){
+            $script:stage='timestamp_configuration';Assert-Timestamp
+            $script:result.timestamp_service_status='configured_not_probed'
+        }
+        $script:result.passed=$true
     }else{
     foreach($rel in $expected){if(-not(Test-Path -LiteralPath (Join-Path $root $rel) -PathType Leaf)){Stop-Auth 'first_party_missing' 'A required first-party PE is absent; unrelated directories will not be scanned.'}}
     $script:stage='static_tree';$before=@(Static-Tree $root)

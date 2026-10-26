@@ -155,6 +155,26 @@ class AuthenticodeWindowsTests(unittest.TestCase):
         self.assert_failed(completed, value)
         self.assertEqual(value["files"], [])
         self.assertEqual(value["configuration_state"], "not_configured")
+        self.assertTrue(value["configuration_only"])
+        self.assertFalse(value["private_key_operation_tested"])
+        self.assertFalse(value["timestamp_service_protocol_tested"])
+        self.assertEqual(value["timestamp_service_status"], "not_configured")
+
+    def test_configuration_url_validation_is_not_timestamp_protocol_acceptance(self):
+        completed, value = self.run_operation(extra=("-TimestampUrl", "https://timestamp.unit.invalid/rfc3161"))
+        self.assertEqual(completed.returncode, 0)
+        self.assertTrue(value["passed"])
+        self.assertTrue(value["configuration_only"])
+        self.assertFalse(value["production_ready"])
+        self.assertFalse(value["formal_verified"])
+        self.assertFalse(value["private_key_operation_tested"])
+        self.assertFalse(value["timestamp_service_protocol_tested"])
+        self.assertEqual(value["timestamp_service_status"], "configured_not_probed")
+
+    def test_configuration_url_with_credentials_remains_rejected_without_probing(self):
+        completed, value = self.run_operation(extra=("-TimestampUrl", "https://untrusted-user@timestamp.unit.invalid"))
+        self.assert_failed(completed, value)
+        self.assertFalse(value["timestamp_service_protocol_tested"])
 
     def test_missing_wrong_and_malformed_thumbprints_never_substitute_identity(self):
         for thumb in ("A" * 40, "bad-thumbprint", "A" * 40 + ";exit 0"):

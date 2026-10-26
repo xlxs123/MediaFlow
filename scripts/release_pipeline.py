@@ -88,9 +88,15 @@ class Runner:
             tree=ProcessTree(process)
             try:
                 output,error=process.communicate(input=input_bytes,timeout=timeout)
-            except subprocess.TimeoutExpired:
+            except subprocess.TimeoutExpired as expired:
                 tree.terminate()
-                process.communicate(timeout=15)
+                try:
+                    output,error=process.communicate(timeout=15)
+                except subprocess.TimeoutExpired as stopped:
+                    output,error=stopped.output or expired.output or b'',stopped.stderr or expired.stderr or b''
+                if logs:
+                    for suffix,data in (('stdout',output),('stderr',error)):
+                        with (self.directory/(stage+'.'+suffix+'.log')).open('xb') as handle:handle.write(data)
                 raise PipelineError('阶段超时，已停止本次进程树：'+stage) from None
             if logs:
                 # Authentication and vault operations always use logs=False.
@@ -392,6 +398,10 @@ class Pipeline:
         self.lock=None
 
     def event(self,stage,status='running',**details):
+        starts=getattr(self,'_stage_starts',{})
+        if status=='running':starts[stage]=time.monotonic()
+        elif stage in starts:details.setdefault('elapsed_seconds',round(time.monotonic()-starts.pop(stage),4))
+        self._stage_starts=starts
         self.report['stage']=stage
         self.report['events'].append(dict(time=utc(),stage=stage,status=status,**details))
         save(self.directory/'report.json',self.report)
@@ -399,7 +409,14 @@ class Pipeline:
 
     def command(self,program,*args,stage,timeout=600,env=None,logs=True):
         self.event(stage)
-        return self.runner.call([program,*args],stage,timeout=timeout,env=env,logs=logs)[1]
+        try:
+            result=self.runner.call([program,*args],stage,timeout=timeout,env=env,logs=logs)
+            if result[0]!=0:raise PipelineError('阶段进程未成功退出：'+stage)
+        except BaseException as error:
+            self.event(stage,'failed',error_type=type(error).__name__)
+            raise
+        self.event(stage,'passed',exit_code=result[0])
+        return result[1]
 
     def git_value(self,*args):
         return self.runner.call([self.git,*args],'git-read',timeout=45,logs=False)[1].decode('utf-8').strip()
@@ -522,6 +539,7 @@ class Pipeline:
                 or any(g.get('unexpected_skips') for g in tests.get('groups',[]))):
             raise PipelineError('必要增量测试未完整通过，不能继续构建或签名。')
         self.report['tests']={k:tests[k] for k in ('tests','failures','errors','skipped','passed','source_sha256')}
+        self.event('verified-windows-ci-artifact')
         if self.args.existing_release_dir:
             self.release=_plain(self.args.existing_release_dir).resolve()
             if self.directory.is_relative_to(self.release):raise PipelineError('运行目录不能位于既有发布目录中。')
@@ -537,15 +555,16 @@ class Pipeline:
                 default_branch=self.source_info['default_branch'])
             self.report['build'].update(byte_binding=bound,cryptographic_provenance=proof)
         else:
-            self.event('verified-windows-ci-artifact')
             fetched=self.github.fetch_build(self.ci,self.source_repo,self.args.version,self.root,
                 self.directory/'ci-build',source_digest(self.root))
             self.release=Path(fetched['release_directory'])
             self.report['ci']['artifact_verification']=fetched
             self.report['build']=dict(mode='passed-windows-ci-artifact',new_local_exe_built=False)
+        self.event('verified-windows-ci-artifact','passed')
         self.unsigned_release=self.release
         self.report['unsigned_release_directory']=str(self.unsigned_release)
         self.ci_sbom=self.directory/'ci-sbom'
+        self.event('verified-native-sbom')
         self.report['sbom']=self.github.fetch_sbom(self.ci,self.source_repo,self.args.version,self.ci_sbom)
         source_receipt=self.unsigned_release.parent/'verification/ci/build-attestation.json'
         original_receipt=document(source_receipt)
@@ -553,6 +572,7 @@ class Pipeline:
         if (original_generation.get('receipt_sha256')!=_file_hash(source_receipt)
                 or document(self.ci_sbom/'inventory.json').get('release_files')!=original_receipt.get('files')):
             raise PipelineError('原始 CI 收据、实际发布文件和已证明 SBOM 不属于同一构建，禁止签名。')
+        self.event('verified-native-sbom','passed')
         if not self.read_only_dry:
             signed_release=self.directory/'authenticode-build'
             auth=authenticode('Sign',self.attempt/'authenticode-signing.json',release=self.unsigned_release,
@@ -575,8 +595,10 @@ class Pipeline:
         self.report['build'].update(build_id=stamp['build_id'],source_sha256=stamp['source_sha256'],
             exe_sha256=_file_hash(self.release/'MediaFlow.exe'),release_directory=str(self.release))
         if self.read_only_dry:
+            self.event('unsigned-authenticode-inspection')
             self.report['authenticode']=authenticode('Inspect',self.attempt/'unsigned-authenticode.json',
                 release=self.release,mode='CI',pwsh=self.pwsh,runner=self.runner.call,stage='unsigned-authenticode-inspection')
+            self.event('unsigned-authenticode-inspection','passed',exit_code=0)
             return
         reports=[_plain(p).resolve() for p in self.args.acceptance_report]
         if reports and not self.args.existing_release_dir:raise PipelineError('新构建不能沿用旧验收报告。')
@@ -674,7 +696,8 @@ class Pipeline:
             if not self.dry:raise PipelineError('正式 Release 尚不可公开读取。')
             self.event('public-existing-release','not_available',reason='No public release for this rehearsal version; no public claim')
             return
-        self.event('public-existing-release' if self.dry else 'public-new-release')
+        public_stage='public-existing-release' if self.dry else 'public-new-release'
+        self.event(public_stage)
         _match_release_inventory(self.release,{entry['path']:entry for entry in self.manifest['files']},None,None,'public-client-release-recheck')
         directory=self.attempt/'public-acceptance'
         self.command(self.python,'-B',self.root/'scripts/accept_release_update.py','--release-dir',self.release,
@@ -694,6 +717,7 @@ class Pipeline:
             staged_package_was_publicly_verified=not self.dry)
         self.report['public_online_verified']=True
         self.report['production_chain_verified']=not self.dry and self.report['published'] is True
+        self.event(public_stage,'passed')
         self.event('public-acceptance','passed')
 
     def run(self):
@@ -748,6 +772,8 @@ class Pipeline:
             self.event('dry-run-complete' if self.dry else 'production-release-complete','passed')
             return self.report
         except BaseException as error:
+            for stage in list(getattr(self,'_stage_starts',{})):
+                self.event(stage,'failed',error_type=type(error).__name__)
             # An interrupted publisher may have completed GitHub publication.
             # Do not claim rollback or delete any remote assets on failure.
             if hasattr(self,'github') and hasattr(self,'release_repo'):
