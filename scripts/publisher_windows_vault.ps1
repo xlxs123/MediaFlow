@@ -17,7 +17,11 @@ param(
     [string]$PublishedAt,
     [string]$ReleasePage,
     [string]$ReleaseNotesFile,
-    [string]$MinimumAppVersion = '2.0.1'
+    [string]$MinimumAppVersion = '2.0.1',
+    [string]$CertificateThumbprint = '',
+    [ValidateSet('CurrentUser','LocalMachine')][string]$CertificateStore = 'CurrentUser',
+    [string]$TimestampUrl = '',
+    [string]$SignToolPath = ''
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -67,6 +71,21 @@ try {
             foreach ($required in @($ReleaseDirectory,$OutputDirectory,$AcceptanceReceipt,$PackageUrl,$PublishedAt,$ReleasePage,$ReleaseNotesFile)) {
                 if (-not $required) { throw 'Publishing requires explicit accepted release, receipt and actual hosted asset URLs.' }
             }
+            # Authenticate actual application bytes before opening the separate
+            # Ed25519 vault. A test/unsigned PE cannot acquire a formal manifest.
+            [Environment]::SetEnvironmentVariable($envName,$null)
+            $authReport = [IO.Path]::GetFullPath($OutputDirectory) + '.authenticode-' + [Guid]::NewGuid().ToString('N') + '.json'
+            $authArguments = @('-Operation','Verify','-Mode','Production','-ReleaseDirectory',$ReleaseDirectory,
+                '-Report',$authReport,'-CertificateThumbprint',$CertificateThumbprint,
+                '-CertificateStore',$CertificateStore,'-TimestampUrl',$TimestampUrl)
+            if ($SignToolPath) { $authArguments += @('-SignToolPath',$SignToolPath) }
+            & (Join-Path $PSHOME 'pwsh.exe') -NoLogo -NoProfile -NonInteractive -File `
+                (Join-Path $PSScriptRoot 'authenticode.ps1') @authArguments
+            if ($LASTEXITCODE -ne 0) { throw 'Authenticode 未配置或正式代码签名验证失败；未读取正式 Ed25519 保险库。' }
+            $auth = Get-Content -LiteralPath $authReport -Raw | ConvertFrom-Json
+            if (-not $auth.passed -or -not $auth.formal_verified -or $auth.mode -ne 'Production') {
+                throw 'Formal Authenticode evidence is incomplete; the publisher vault remains unopened.'
+            }
         }
         Assert-VaultAcl $vault
         $plain = [Security.Cryptography.ProtectedData]::Unprotect([IO.File]::ReadAllBytes($passwordFile),$entropy,$scope)
@@ -82,7 +101,9 @@ try {
             --release-dir $ReleaseDirectory --output-dir $OutputDirectory --package-url $PackageUrl `
             --published-at $PublishedAt --key-id $KeyId --trusted-keys-file $publicFile `
             --acceptance-receipt $AcceptanceReceipt --private-key-file $keyFile --password-env $envName `
-            --notes $notes --release-page $ReleasePage --minimum-app-version $MinimumAppVersion
+            --notes $notes --release-page $ReleasePage --minimum-app-version $MinimumAppVersion `
+            --certificate-thumbprint $CertificateThumbprint --certificate-store $CertificateStore `
+            --timestamp-url $TimestampUrl --sign-tool-path $SignToolPath --pwsh (Join-Path $PSHOME 'pwsh.exe')
         if ($LASTEXITCODE -ne 0) { throw 'Signed publication failed; old application and external key were preserved.' }
     }
 } finally {

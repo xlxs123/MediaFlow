@@ -63,6 +63,8 @@ class SBOMValidationTests(unittest.TestCase):
         self.assertEqual(report['build_tool_components'], 1)
         self.assertEqual(report['github'], self.github)
         self.assertFalse(report['cryptographic_provenance_verified'])
+        self.assertFalse(report['native_coverage_verified'])
+        self.assertEqual(report['native_coverage'], 'legacy-not-assessed')
         for name, digest in report['document_sha256'].items():
             self.assertEqual(digest, hashlib.sha256((self.directory / name).read_bytes()).hexdigest())
         self.assertEqual(json.loads((self.directory / 'validation.json').read_text('utf-8')), report)
@@ -103,6 +105,53 @@ class SBOMValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(validation.SBOMValidationError, 'Existing SBOM validation evidence is preserved'):
             validation.validate(self.directory)
         self.assertEqual(path.read_bytes(), original)
+
+    def test_legacy_inventory_cannot_satisfy_required_native_coverage(self):
+        with self.assertRaisesRegex(validation.SBOMValidationError, 'no verified native inventory'):
+            validation.validate(self.directory, require_native=True)
+        self.assertFalse((self.directory / 'validation.json').exists())
+
+    def test_duplicate_dependency_or_absent_ref_is_refused_with_fresh_hashes(self):
+        from copy import deepcopy
+        initial = deepcopy(self.bom)
+        for kind in ('duplicate-row', 'duplicate-target', 'unknown-ref', 'build-tool-as-runtime'):
+            self.bom = deepcopy(initial)
+            if kind == 'duplicate-row':
+                self.bom['dependencies'].append(deepcopy(self.bom['dependencies'][0]))
+            elif kind == 'duplicate-target':
+                self.bom['dependencies'][0]['dependsOn'] *= 2
+            elif kind == 'unknown-ref':
+                self.bom['dependencies'][0]['dependsOn'] = ['absent-ref']
+            else:
+                self.bom['components'].append(deepcopy(self.bom['metadata']['tools']['components'][0]))
+            self.write_bound_documents()
+            with self.subTest(kind=kind), self.assertRaises(validation.SBOMValidationError):
+                validation.validate(self.directory)
+
+    def test_sensitive_fields_are_refused_without_printing_their_values(self):
+        fixture = 'synthetic-secret-fixture-only'
+        with self.assertRaisesRegex(validation.SBOMValidationError, 'sensitive field') as error:
+            validation.public_strings({'password': fixture})
+        self.assertNotIn(fixture, str(error.exception))
+
+    def test_independent_validator_never_imports_application_or_build_runtime(self):
+        import subprocess
+        import sys
+        script = '''import importlib.abc, json, sys
+class Deny(importlib.abc.MetaPathFinder):
+ def find_spec(self, fullname, path=None, target=None):
+  if fullname.split('.')[0] in {'core','PySide6','PyInstaller','pefile','cryptography'}:
+   raise RuntimeError('independent validator attempted application/build imports')
+sys.meta_path.insert(0, Deny())
+from scripts.validate_sbom import validate_documents
+data=json.load(sys.stdin)
+print(json.dumps({'passed':validate_documents(data['bom'],data['inventory'])['passed']}))
+'''
+        result = subprocess.run([sys.executable, '-B', '-c', script], cwd=validation.ROOT,
+            input=json.dumps(dict(bom=self.bom, inventory=self.inventory)), capture_output=True,
+            text=True, timeout=30, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(json.loads(result.stdout)['passed'])
 
 
 if __name__ == '__main__':

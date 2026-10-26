@@ -111,6 +111,14 @@ class SBOMTests(unittest.TestCase):
             self.assertNotIn(str(self.root), path.read_text('utf-8'))
         self.assertEqual(result['sbom_sha256'], hashlib.sha256((self.output / 'mediaflow.cdx.json').read_bytes()).hexdigest())
         inventory = json.loads((self.output / 'inventory.json').read_text('utf-8'))
+        self.assertEqual(inventory['schema_version'], 2)
+        native_objects = {item['ref']:item for item in inventory['native_inventory']['objects']}
+        self.assertEqual(native_objects['native-file:MediaFlow.exe']['sha256'],
+                         hashlib.sha256((self.release / 'MediaFlow.exe').read_bytes()).hexdigest())
+        runtime_ref = 'native-file:MediaFlow.exe!/' + self.runtime.name
+        self.assertIn(runtime_ref, native_objects)
+        dependencies = {item['ref']:item['dependsOn'] for item in bom['dependencies']}
+        self.assertIn(runtime_ref, dependencies['runtime:cpython'])
         self.assertEqual(inventory['python_modules'][0]['source_sha256'], hashlib.sha256(self.module.read_bytes()).hexdigest())
         self.assertEqual(inventory['python_modules'][0]['distributions'], ['example-pkg@1.2.3'])
 

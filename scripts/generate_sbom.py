@@ -20,7 +20,7 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import sys
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote
 import uuid
 from types import CodeType
 
@@ -31,6 +31,7 @@ if __package__ in ('', None):
 from core.data_migration import frozen_file
 from scripts.ci_build_receipt import verify_receipt
 from scripts.package_update import _plain
+from scripts.native_sbom import discover_native, native_components, provenance_release_version
 
 
 class SBOMError(RuntimeError):
@@ -268,7 +269,8 @@ def _archive_inventory(release, build):
                 expected = compile(original_data, code.co_filename, 'exec', optimize=optimize, dont_inherit=True)
             if not isinstance(expected, CodeType) or code != replace_filename_in_code_object(expected, code.co_filename):
                 raise SBOMError('Actual bootstrap bytecode differs from its build source.')
-        members.append({'path': normalized, 'size': len(data), 'sha256': _digest(data), 'kind': kind})
+        members.append({'path': normalized, 'size': len(data), 'sha256': _digest(data), 'kind': kind,
+                        'is_pe': data[:2] == b'MZ'})
     owners, distributions = _distributions(selected_pyz + selected_pkg, source_hashes)
     for item, (_, source, _) in zip(modules, selected_pyz):
         item['distributions'] = sorted(owners.get(os.path.normcase(str(Path(source).resolve())), ()))
@@ -280,20 +282,8 @@ def _archive_inventory(release, build):
 
 
 def _tool_version(name, provenance):
-    # Versions are release identifiers explicitly stated in verified provenance,
-    # never guessed from the name of the locally selected executable.
-    record = provenance.get(name, {})
-    source = record.get('source', '')
-    url = urlsplit(source)
-    if url.scheme != 'https' or url.username or url.password or url.query or url.fragment:
-        return None
-    if name == 'yt-dlp.exe' and url.netloc == 'github.com':
-        match = re.fullmatch(r'/yt-dlp/yt-dlp/releases/download/([A-Za-z0-9_.+-]+)/yt-dlp\.exe', url.path)
-        return match[1] if match else None
-    if name in ('ffmpeg.exe', 'ffprobe.exe') and url.netloc == 'github.com':
-        match = re.fullmatch(r'/BtbN/FFmpeg-Builds/releases/download/[^/]+/ffmpeg-(n[0-9][A-Za-z0-9_.+-]*)-win64-gpl-[A-Za-z0-9_.+-]+\.zip', url.path)
-        return match[1] if match else None
-    return None
+    # Keep callers compatible with the original release-identifier contract.
+    return provenance_release_version(name, provenance)
 
 
 def validate_public_document(document):
@@ -355,9 +345,12 @@ def generate(release_dir, build_dir, receipt_path, output_dir, *, policy_path=No
                             kind='framework', version=runtime)
         python['properties'] += _properties(version_evidence='Analysis runtime string and byte-matched embedded Python DLL')
         components.append(python)
-        # Unattributed embedded native files remain honest file components with
-        # their own actual bytes and no invented upstream/version relationship.
+        # Native PE files have their own complete byte-bound inventory below.
+        # Keep non-PE bootstrap support here; never invent a runtime package
+        # merely because PyInstaller supplied a helper during the build.
         for item in members:
+            if item['is_pe']:
+                continue
             is_support = bool(set(item['distributions']) & support_distributions)
             if not is_support and (item['kind'] not in ('BINARY', 'EXTENSION') or item['distributions'] or item in python_members):
                 continue
@@ -368,22 +361,11 @@ def generate(release_dir, build_dir, receipt_path, output_dir, *, policy_path=No
             component['properties'] += _properties(version_state='unknown',
                 verified_distribution_records=','.join(item['distributions']))
             components.append(component)
-        for item in files:
-            name = item['path']
-            if not name.startswith('tools/') or not name.lower().endswith(('.exe', '.dll')):
-                continue
-            basename = PurePosixPath(name).name
-            record = provenance.get(basename, {})
-            if record and record.get('sha256') != item['sha256']:
-                raise SBOMError('Portable tool provenance differs from receipt-bound actual bytes.')
-            version = _tool_version(basename, provenance)
-            component = _component(basename, 'portable-file:' + name, 'portable-tool-or-library',
-                kind='application' if name.endswith('.exe') else 'library', version=version,
-                sha256=item['sha256'], location=name)
-            if not version:
-                component['properties'] += _properties(version_state='unknown')
-                limitations.append('No verified version metadata for distributed file: ' + name)
-            components.append(component)
+        native = discover_native(release, files, members, provenance=provenance,
+                                 distributions=distributions, policy=policy)
+        native_files, native_dependencies = native_components(native)
+        components.extend(native_files)
+        limitations.append('Native import and delay-import tables are observed dependencies; unresolved, managed and static dependencies remain explicit inventory gaps.')
         # Tools are inventory-generation/build-environment facts, not runtime
         # components. They do not appear under root dependencies.
         observed_tools = []
@@ -394,9 +376,9 @@ def generate(release_dir, build_dir, receipt_path, output_dir, *, policy_path=No
             except metadata.PackageNotFoundError:
                 continue
         github = document['github']
-        inventory = {'schema_version': 1, 'release_files': files, 'embedded_members': members,
+        inventory = {'schema_version': 2, 'release_files': files, 'embedded_members': members,
                      'python_modules': modules, 'toc_sha256': toc_hashes,
-                     'distribution_metadata': distributions}
+                     'distribution_metadata': distributions, 'native_inventory': native}
         inventory_bytes = validate_public_document(inventory)
         timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
         root = _component('MediaFlow', 'application:MediaFlow', 'portable-release', kind='application',
@@ -409,13 +391,23 @@ def generate(release_dir, build_dir, receipt_path, output_dir, *, policy_path=No
             receipt_authenticated=False, provenance_attestation_verified=False,
             generation_policy_sha256=_digest(_read(policy_path)))
         properties += _properties(**{'limitation-' + str(index + 1): item for index, item in enumerate(limitations)})
+        dependency_map = {root['bom-ref']: {item['bom-ref'] for item in components}}
+        runtime_refs = dependency_map[root['bom-ref']] | {root['bom-ref']}
+        for dependency in native_dependencies:
+            # Build-only distributions have no runtime component. Their actual
+            # support files remain independently identified native components.
+            if dependency['ref'] in runtime_refs:
+                dependency_map.setdefault(dependency['ref'], set()).update(dependency['dependsOn'])
+        dependency_map.setdefault('runtime:cpython', set()).update(
+            'native-file:MediaFlow.exe!/' + item['path'] for item in python_members)
         bom = {'$schema': 'http://cyclonedx.org/schema/bom-1.6.schema.json',
             'bomFormat': 'CycloneDX', 'specVersion': '1.6', 'version': 1,
             'serialNumber': 'urn:uuid:' + str(uuid.uuid4()),
             'metadata': {'timestamp': timestamp, 'component': root,
                          'tools': {'components': observed_tools}, 'properties': properties},
             'components': sorted(components, key=lambda item: item['bom-ref']),
-            'dependencies': [{'ref': root['bom-ref'], 'dependsOn': sorted(item['bom-ref'] for item in components)}],
+            'dependencies': [{'ref': ref, 'dependsOn': sorted(targets - {ref})}
+                             for ref, targets in sorted(dependency_map.items())],
             'externalReferences': [
                 {'type': 'vcs', 'url': 'https://github.com/' + github['repository'] + '/tree/' + github['commit']},
                 {'type': 'build-system', 'url': 'https://github.com/' + github['repository'] + '/actions/runs/' + github['run_id']}],
@@ -429,6 +421,8 @@ def generate(release_dir, build_dir, receipt_path, output_dir, *, policy_path=No
             'packaged_python_distribution_records': len(distributions),
             'bundled_build_support_members': sum(bool(set(item['distributions']) & support_distributions) for item in members),
             'components': len(components), 'observed_build_tools': len(observed_tools),
+            'native_objects': len(native['objects']), 'native_relations': len(native['relations']),
+            'native_inventory_gaps': len(native['gaps']),
             'sbom_sha256': _digest(bom_bytes), 'inventory_sha256': _digest(inventory_bytes),
             'receipt_sha256': checked['receipt_sha256'], 'toc_sha256': toc_hashes,
             'tests': {'passed': True, 'count': document['tests']['tests']},

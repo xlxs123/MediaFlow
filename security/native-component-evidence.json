@@ -1,0 +1,211 @@
+{
+  "schema_version": 1,
+  "binaries": [
+    {
+      "path": "tools/ffmpeg.exe",
+      "sha256": "1cbff81436de6364012b356726b46edfde4200f9d38d4622ff4f4978af0218f8",
+      "version_report_sha256": "5c754aae8706bacabd6d07b414436303d20b3bf1704cabe0dc5efde157f078bd",
+      "capture_kind": "receipt-bound-known-tool-version-output",
+      "capture_exit_code": 0,
+      "reported_linked_libraries": [
+        {
+          "name": "libavutil",
+          "version": "61.1.102"
+        },
+        {
+          "name": "libavcodec",
+          "version": "63.1.102"
+        },
+        {
+          "name": "libavformat",
+          "version": "63.1.102"
+        },
+        {
+          "name": "libavdevice",
+          "version": "63.1.102"
+        },
+        {
+          "name": "libavfilter",
+          "version": "12.1.102"
+        },
+        {
+          "name": "libswscale",
+          "version": "10.1.102"
+        },
+        {
+          "name": "libswresample",
+          "version": "7.1.102"
+        }
+      ],
+      "declared_static_configuration": {
+        "static_pkg_config": true,
+        "enabled_libraries": [
+          "libaom",
+          "libaribb24",
+          "libaribcaption",
+          "libass",
+          "libbluray",
+          "libdav1d",
+          "libdavs2",
+          "libdvdnav",
+          "libdvdread",
+          "libfreetype",
+          "libfribidi",
+          "libgme",
+          "libharfbuzz",
+          "libjxl",
+          "libkvazaar",
+          "liblcevc-dec",
+          "libmp3lame",
+          "liboapv",
+          "libopencore-amrnb",
+          "libopencore-amrwb",
+          "libopenh264",
+          "libopenjpeg",
+          "libopenmpt",
+          "libopus",
+          "libplacebo",
+          "librav1e",
+          "librist",
+          "librsvg",
+          "librubberband",
+          "libsnappy",
+          "libsoxr",
+          "libsrt",
+          "libssh",
+          "libsvtav1",
+          "libtheora",
+          "libtwolame",
+          "libuavs3d",
+          "libvidstab",
+          "libvmaf",
+          "libvorbis",
+          "libvpl",
+          "libvpx",
+          "libvvenc",
+          "libwebp",
+          "libx264",
+          "libx265",
+          "libxavs2",
+          "libxml2",
+          "libxvid",
+          "libzimg",
+          "libzmq",
+          "libzvbi"
+        ],
+        "presence": "declared-configuration-not-proof-of-every-per-binary-link",
+        "versions": "unknown"
+      },
+      "upstream_provenance": {
+        "source": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-22-13-06/ffmpeg-n9.0.2-33-g4cf298e66a-win64-gpl-9.0.zip",
+        "archive_sha256": "5a8898e31f2c452062d1f1be475befd8ffba04db11e9f8251da3d10d9a1ae2e5",
+        "build_recipe_commit": "937868360a21d711ec94a33f5591d345ad9b7754",
+        "ffmpeg_commit": "4cf298e66a",
+        "upstream_workflow_run": 39776938430
+      }
+    },
+    {
+      "path": "tools/ffprobe.exe",
+      "sha256": "3298debc7334bc482b771541ada41e5f6208f6e4014fc644ed7ebd0ac5cd9709",
+      "version_report_sha256": "2a9d994df00ddb53df99875910ed148fee400f11d4379f9f2c3788f75eac01ca",
+      "capture_kind": "receipt-bound-known-tool-version-output",
+      "capture_exit_code": 0,
+      "reported_linked_libraries": [
+        {
+          "name": "libavutil",
+          "version": "61.1.102"
+        },
+        {
+          "name": "libavcodec",
+          "version": "63.1.102"
+        },
+        {
+          "name": "libavformat",
+          "version": "63.1.102"
+        },
+        {
+          "name": "libavdevice",
+          "version": "63.1.102"
+        },
+        {
+          "name": "libavfilter",
+          "version": "12.1.102"
+        },
+        {
+          "name": "libswscale",
+          "version": "10.1.102"
+        },
+        {
+          "name": "libswresample",
+          "version": "7.1.102"
+        }
+      ],
+      "declared_static_configuration": {
+        "static_pkg_config": true,
+        "enabled_libraries": [
+          "libaom",
+          "libaribb24",
+          "libaribcaption",
+          "libass",
+          "libbluray",
+          "libdav1d",
+          "libdavs2",
+          "libdvdnav",
+          "libdvdread",
+          "libfreetype",
+          "libfribidi",
+          "libgme",
+          "libharfbuzz",
+          "libjxl",
+          "libkvazaar",
+          "liblcevc-dec",
+          "libmp3lame",
+          "liboapv",
+          "libopencore-amrnb",
+          "libopencore-amrwb",
+          "libopenh264",
+          "libopenjpeg",
+          "libopenmpt",
+          "libopus",
+          "libplacebo",
+          "librav1e",
+          "librist",
+          "librsvg",
+          "librubberband",
+          "libsnappy",
+          "libsoxr",
+          "libsrt",
+          "libssh",
+          "libsvtav1",
+          "libtheora",
+          "libtwolame",
+          "libuavs3d",
+          "libvidstab",
+          "libvmaf",
+          "libvorbis",
+          "libvpl",
+          "libvpx",
+          "libvvenc",
+          "libwebp",
+          "libx264",
+          "libx265",
+          "libxavs2",
+          "libxml2",
+          "libxvid",
+          "libzimg",
+          "libzmq",
+          "libzvbi"
+        ],
+        "presence": "declared-configuration-not-proof-of-every-per-binary-link",
+        "versions": "unknown"
+      },
+      "upstream_provenance": {
+        "source": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-22-13-06/ffmpeg-n9.0.2-33-g4cf298e66a-win64-gpl-9.0.zip",
+        "archive_sha256": "5a8898e31f2c452062d1f1be475befd8ffba04db11e9f8251da3d10d9a1ae2e5",
+        "build_recipe_commit": "937868360a21d711ec94a33f5591d345ad9b7754",
+        "ffmpeg_commit": "4cf298e66a",
+        "upstream_workflow_run": 39776938430
+      }
+    }
+  ]
+}

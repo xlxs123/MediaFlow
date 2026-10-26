@@ -94,10 +94,23 @@ jobs:
           & .\.venv\Scripts\python.exe -X utf8 -B tools\prepare_tools.py
           if ($LASTEXITCODE -ne 0) { throw 'Portable tools failed download or publisher checksum verification.' }
 
+      - name: Prepare isolated regression dependencies
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $testEnvironment = Join-Path $env:RUNNER_TEMP 'mediaflow-regression-venv'
+          python -m venv $testEnvironment
+          if ($LASTEXITCODE -ne 0) { throw 'Could not create the separate regression environment.' }
+          $testPython = Join-Path $testEnvironment 'Scripts/python.exe'
+          & $testPython -m pip install -r requirements-build.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned regression bootstrap failed.' }
+          & $testPython -m pip install -r requirements.txt -r requirements-security.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned application and schema-test dependencies failed.' }
+          ('MEDIAFLOW_TEST_PYTHON=' + $testPython) | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       - name: Update, signature, deployment and rollback regression
         run: |
           $ErrorActionPreference = 'Stop'
-          & .\.venv\Scripts\python.exe -X utf8 -B tests\run_update_tests.py --report-dir verification/ci/update
+          & $env:MEDIAFLOW_TEST_PYTHON -X utf8 -B tests\run_update_tests.py --report-dir verification/ci/update
           if ($LASTEXITCODE -ne 0) {
             foreach ($name in @('core', 'ui', 'output')) {
               $log = Join-Path 'verification/ci/update' ($name + '.txt')
@@ -139,6 +152,40 @@ jobs:
               --runtime-identity $privateIdentity --report verification/ci/release-structure.json
           if ($LASTEXITCODE -ne 0) { throw 'Complete portable-release structure check failed.' }
 
+      - name: Inspect unsigned application and preserved third-party signatures
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & (Join-Path $PSHOME 'pwsh.exe') -NoLogo -NoProfile -NonInteractive -File scripts/authenticode.ps1 `
+            -Operation Inspect -Mode CI -ReleaseDirectory (Join-Path $env:GITHUB_WORKSPACE 'dist-mediaflow-ci') `
+            -Report (Join-Path $env:GITHUB_WORKSPACE 'verification/ci/authenticode-inventory.json')
+          if ($LASTEXITCODE -ne 0) { throw 'Unsigned/third-party Authenticode inspection failed.' }
+          $result = Get-Content -LiteralPath verification/ci/authenticode-inventory.json -Raw | ConvertFrom-Json
+          if (-not $result.passed -or $result.formal_verified -or $result.mode -ne 'CI') {
+            throw 'Ordinary CI must inspect bytes without claiming formal publisher signing.'
+          }
+
+      - name: Exercise isolated test-certificate signing and rejection paths
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $sdkRoot = (Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Windows Kits\Installed Roots' -Name KitsRoot10).KitsRoot10
+          $sdk = Get-ChildItem -LiteralPath (Join-Path $sdkRoot 'bin') -Recurse -File -Filter signtool.exe |
+            Where-Object FullName -Match '\\x64\\signtool\.exe$' |
+            Sort-Object { [version]$_.VersionInfo.ProductVersion } | Select-Object -Last 1
+          if (-not $sdk) { throw 'Official Windows SDK x64 SignTool is required for isolated integration.' }
+          $workRoot = Join-Path $env:RUNNER_TEMP 'MediaFlow-authenticode-tests'
+          New-Item -ItemType Directory -Path $workRoot -Force | Out-Null
+          $work = Join-Path $workRoot ($env:GITHUB_RUN_ID + '-' + $env:GITHUB_RUN_ATTEMPT)
+          & (Join-Path $PSHOME 'pwsh.exe') -NoLogo -NoProfile -NonInteractive -File tests/authenticode_local_integration.ps1 `
+            -WorkRoot $workRoot -WorkDirectory $work -SourceDirectory (Join-Path $env:GITHUB_WORKSPACE 'dist-mediaflow-ci') `
+            -SignToolPath $sdk.FullName
+          if ($LASTEXITCODE -ne 0) { throw 'Actual test-certificate integration failed; no production certificate was requested.' }
+          $resultPath = Join-Path $work 'integration-results.json'
+          $result = Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
+          if (-not $result.passed -or $result.formal_signed -or -not $result.trust_roots_unchanged) {
+            throw 'Test-certificate integration must remain separate from Windows trust and formal signing.'
+          }
+          Copy-Item -LiteralPath $resultPath -Destination verification/ci/authenticode-tests.json -ErrorAction Stop
+
       - name: Bind passed CI checks to the complete build
         run: |
           $ErrorActionPreference = 'Stop'
@@ -167,7 +214,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Independent schema-validator environment failed.' }
           & .\.security-venv\Scripts\python.exe -m pip install -r requirements-build.txt -r requirements-security.txt
           if ($LASTEXITCODE -ne 0) { throw 'Pinned schema validator installation failed.' }
-          & .\.security-venv\Scripts\python.exe -B scripts/validate_sbom.py --directory verification/ci/sbom
+          & .\.security-venv\Scripts\python.exe -B scripts/validate_sbom.py --directory verification/ci/sbom --require-native
           if ($LASTEXITCODE -ne 0) { throw 'Official CycloneDX schema or inventory binding failed.' }
 
       - name: Retain verified SBOM and generation evidence
@@ -187,6 +234,8 @@ jobs:
             verification/ci/release-structure.json
             verification/ci/update/results.json
             verification/ci/build-attestation.json
+            verification/ci/authenticode-inventory.json
+            verification/ci/authenticode-tests.json
           if-no-files-found: error
           retention-days: 7
 
@@ -234,7 +283,10 @@ jobs:
             verified-build/verification/ci/release-structure.json
             verified-sbom/mediaflow.cdx.json
             verified-sbom/inventory.json
+            verified-sbom/generation.json
             verified-sbom/validation.json
+            verified-build/verification/ci/authenticode-inventory.json
+            verified-build/verification/ci/authenticode-tests.json
       - name: Retain official Sigstore verification bundle
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

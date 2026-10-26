@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "selection": "git_index",
-  "index_snapshot_sha256": "22d47696f036a9b5969d04cc63c1b64133f70fa9f84b853d87e1f735d3307d8d",
+  "index_snapshot_sha256": "4c29afe71f52d4e2d9cf75f417c2619156a0c106b7d4c60a20d7038c899c1116",
   "scope": "人工复核所列规则的代码上下文、合成值与临时夹具来源；不声称穷尽所有秘密或完成二进制许可合规。",
   "reviews": [
     {
@@ -19,14 +19,14 @@
     },
     {
       "path": "scripts/publish_release.py",
-      "sha256": "3efaf7b6e193c965f95c147886649567d21303f0c5e390bfcd55f89e09de1117",
+      "sha256": "dd4d1e07aea94ea9c763eecfd740d9187c3ac792f7e11365faef259fc2f7cade",
       "classification": "security_code",
-      "reviewed_by": "Codex source disclosure review",
-      "reason": "复核加密 PEM 格式检测与显式 init-key 路径；文件不含私钥字节，初始化仅在用户明确操作时于外部目录运行并加密保存。",
+      "reviewed_by": "Codex exact staged-source review; baseline 510a9da comparison",
+      "reason": "复核加密 PEM 格式检查、显式 init-key 加密保存及新增生产 Authenticode 门禁；标记和生成调用与基线对应代码一致，不含私钥字节。正式可信 Ed25519 密钥在读取私钥前必须验证实际文件的正式代码签名。",
       "reviewed_lines": [
         256,
-        379,
-        381
+        399,
+        401
       ],
       "reviewed_rules": [
         "private_key_generation",
@@ -1025,19 +1025,19 @@
     },
     {
       "path": "tests/test_public_source_audit.py",
-      "sha256": "8f612c99e905e6683883fed0f0b284c66ba69b92b80f5bd7ed216949b6aba6c3",
+      "sha256": "cf2cd54b7058fac3c830027f82c3c92775dc276c450b12476bbeb320d62e83a9",
       "classification": "synthetic_test_data",
       "reviewed_by": "Codex source disclosure review",
-      "reason": "已复核完整文件；全部敏感值是临时合成扫描夹具，新测试仅核实精确公开配置路径，不开放安全目录整体或真实用户数据。",
+      "reason": "复核完整文件及与基线差异：敏感值均为原有合成扫描夹具；新增测试只允许精确两个公开策略/原生元数据文件，仍拒绝其他未审查 security JSON，不扩大目录豁免。",
       "reviewed_lines": [
         45,
         56,
         58,
         65,
         87,
-        157,
-        164,
-        194
+        166,
+        173,
+        203
       ],
       "reviewed_rules": [
         "credential_header_literal",
@@ -1514,12 +1514,12 @@
     },
     {
       "path": "tests/test_release_pipeline.py",
-      "sha256": "2727db1a34a3f097084d82ee9d38cc0ea3fa6cdfd150add4369a1423365c95c2",
+      "sha256": "4f293fe1366965d75b1cb364d511588f65038d4b5b79008793a654668d6c60a9",
       "classification": "synthetic_test_data",
-      "reviewed_by": "Codex source disclosure review",
-      "reason": "已复核完整文件；凭据与GitHub行为均为合成单测夹具，新增安全门禁测试确认失败后不会访问正式保险库，不含真实签名材料。",
+      "reviewed_by": "Codex exact staged-source review; baseline 510a9da comparison",
+      "reason": "复核完整测试文件；此行仍为与基线相同的 unit-secret 合成环境夹具，仅验证子进程剥离密码/私钥环境变量。新增测试覆盖缺证书 DryRun 不访问保险库及恢复拒绝，不含真实凭据。",
       "reviewed_lines": [
-        200
+        210
       ],
       "reviewed_rules": [
         "credential_literal"

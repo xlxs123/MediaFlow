@@ -180,6 +180,18 @@ def publish(args,*,environment=None):
         current=release()
         if current and not current['draft']:
             raise PublicationError('This version is already published. Existing release/assets were preserved.')
+        if not testing:
+            from scripts.release_security import official_publisher_key, verify_package, ReleaseSecurityError
+            if official_publisher_key(load_channel()['trusted_keys'], manifest['signature']['key_id']):
+                try:
+                    report['stage']='formal_authenticode_package_verification';save()
+                    report['authenticode']=verify_package(assets[0],manifest,report_path.parent,
+                        thumbprint=getattr(args,'certificate_thumbprint',''),
+                        store=getattr(args,'certificate_store','CurrentUser'),
+                        timestamp_url=getattr(args,'timestamp_url',''),
+                        sign_tool=getattr(args,'sign_tool_path',''),pwsh=getattr(args,'pwsh','') or None)
+                except ReleaseSecurityError as error:
+                    raise PublicationError(str(error)) from None
         if not current:
             report['stage']='create_draft';save()
             flags=['--prerelease','--latest=false'] if testing else []
@@ -277,6 +289,9 @@ def main():
     p.add_argument('--test-release',action='store_true',help='Only publish an isolated prerelease mirror of existing formal content')
     p.add_argument('--test-tag',default='');p.add_argument('--expected-version',default='')
     p.add_argument('--test-create-only',action='store_true',help='Test-only empty draft checkpoint; never uploads or publishes')
+    p.add_argument('--certificate-thumbprint',default='')
+    p.add_argument('--certificate-store',choices=('CurrentUser','LocalMachine'),default='CurrentUser')
+    p.add_argument('--timestamp-url',default='');p.add_argument('--sign-tool-path',default='');p.add_argument('--pwsh',default='')
     args=p.parse_args()
     try:
         result=publish(args)

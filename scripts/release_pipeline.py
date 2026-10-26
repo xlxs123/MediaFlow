@@ -9,6 +9,7 @@ import argparse
 import base64
 from datetime import datetime, timezone
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -35,6 +36,8 @@ from scripts.publish_release import _file_hash, _read_document, _private_key, _t
 from scripts.publish_github_release import prepare_assets, verified_asset_urls
 from scripts.verify_hosted_release import _match_release_inventory
 from scripts.security_gate import verify_security_run, verify_ci_provenance
+from scripts.release_security import (authenticode, production_options, signing_derivation,
+                                     ReleaseSecurityError)
 from utils.branding import APP_VERSION
 from utils.build_info import source_digest
 
@@ -167,6 +170,8 @@ class GitHub:
         steps={s['name']:s.get('conclusion') for j in jobs for s in j.get('steps',[])}
         required=('Update, signature, deployment and rollback regression','Build an independent Windows folder',
                   'Start the packaged EXE and check complete release structure','Bind passed CI checks to the complete build',
+                  'Inspect unsigned application and preserved third-party signatures',
+                  'Exercise isolated test-certificate signing and rejection paths',
                   'Generate and independently validate actual-package SBOM',
                   'Retain passed build and public summaries',
                   'Attest actual EXE, byte-bound receipt and check reports',
@@ -214,6 +219,44 @@ class GitHub:
             provenance='Official GitHub OIDC/Sigstore attestation verified for the exact byte-bound receipt, source commit and CI run')
         return result
 
+    def fetch_sbom(self,ci,repo,version,output):
+        """Consume the independently validated, officially attested native BOM."""
+        output=Path(output)
+        if output.exists():raise PipelineError('SBOM 证据目录已存在；不会覆盖。')
+        name='MediaFlow-'+version+'-sbom-'+ci['run_id']
+        values=self.api('repos/'+repo+'/actions/runs/'+ci['run_id']+'/artifacts?per_page=100')['artifacts']
+        selected=[value for value in values if value.get('name')==name and value.get('expired') is False]
+        if len(selected)!=1 or not 0<selected[0].get('size_in_bytes',0)<32*1024*1024:
+            raise PipelineError('当前构建缺少有界的 SBOM 原始产物。')
+        artifact=selected[0]
+        code,data,_=self.runner.call([self.gh,'api','--method','GET',
+            'repos/'+repo+'/actions/artifacts/'+str(artifact['id'])+'/zip'],
+            'ci-sbom-download',timeout=180,logs=False,env=self.env)
+        if (code or len(data)!=artifact['size_in_bytes']
+                or 'sha256:'+hashlib.sha256(data).hexdigest()!=artifact.get('digest')):
+            raise PipelineError('下载的 SBOM 与 GitHub 服务器摘要不一致。')
+        allowed={'mediaflow.cdx.json','inventory.json','generation.json','validation.json','SHA256SUMS.txt'}
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            items=archive.infolist()
+            if ({item.filename for item in items}!=allowed or len(items)!=len(allowed)
+                    or sum(item.file_size for item in items)>64*1024*1024
+                    or any(item.flag_bits&1 or stat.S_IFMT(item.external_attr>>16) not in (0,stat.S_IFREG)
+                           or item.external_attr&0x400 for item in items)):
+                raise PipelineError('SBOM 产物含异常成员或结构。')
+            output.mkdir()
+            for item in items:
+                with (output/item.filename).open('xb') as stream:stream.write(archive.read(item))
+        validation=document(output/'validation.json')
+        if validation.get('passed') is not True or validation.get('native_coverage_verified') is not True:
+            raise PipelineError('CI 的 SBOM 尚未通过原生组件闭合校验。')
+        proofs=[verify_ci_provenance(self,repo,ci['commit'],ci['run_id'],output/name)
+                for name in ('mediaflow.cdx.json','inventory.json','generation.json','validation.json')]
+        generation=document(output/'generation.json')
+        if generation.get('github',{}).get('commit')!=ci['commit']:
+            raise PipelineError('SBOM 对应的源码提交不一致。')
+        return dict(passed=True,artifact={key:artifact[key] for key in ('id','name','size_in_bytes','digest')},
+                    original_ci_documents_preserved=True,native_coverage_verified=True,official_proofs=proofs)
+
 
 def extract_ci_artifact(archive_path,output,artifact,repo,commit,run_id,version,source_sha):
     """Reuse update path validation and the CI receipt verifier before executing EXE."""
@@ -221,7 +264,8 @@ def extract_ci_artifact(archive_path,output,artifact,repo,commit,run_id,version,
     output=_plain(output).resolve()
     if output.exists():raise PipelineError('CI 解包目录已存在，不能覆盖。')
     allowed={'verification/ci/release-structure.json','verification/ci/update/results.json',
-             'verification/ci/build-attestation.json'}
+             'verification/ci/build-attestation.json','verification/ci/authenticode-inventory.json',
+             'verification/ci/authenticode-tests.json'}
     with frozen_file(archive_path) as stream:
         h=hashlib.sha256();size=0
         for block in iter(lambda:stream.read(1024*1024),b''):h.update(block);size+=len(block)
@@ -318,6 +362,9 @@ class Pipeline:
         self.gh=args.gh or shutil.which('gh')
         self.pwsh=args.pwsh or shutil.which('pwsh')
         self.dry=args.mode=='dry-run'
+        self.read_only_dry=self.dry and not args.certificate_thumbprint
+        if args.resume and self.read_only_dry:
+            raise PipelineError('未签名只读 DryRun 没有签名恢复点；完整签名恢复需要正式证书配置和原始已证明构建。')
         parse_version(args.version)
         if not 1<=args.ci_wait_seconds<=3600:raise PipelineError('CI 等待时间必须在 1 至 3600 秒之间。')
         base=self.root/'.release-runs'
@@ -420,8 +467,20 @@ class Pipeline:
             default_branch=self.source_info['default_branch'],wait_seconds=self.args.ci_wait_seconds)
         if self.report['security'].get('passed') is not True:
             raise PipelineError('当前提交的安全工作流未通过；禁止读取正式保险库或继续发布。')
-        self.vault=find_vault(self.args.vault_directory,self.key_id,self.channel)
-        if self.vault.is_relative_to(self.root):raise PipelineError('正式密钥保险库必须在源码和运行目录之外。')
+        if not self.read_only_dry:
+            self.auth_options=production_options(self.args.certificate_thumbprint,self.args.certificate_store,
+                self.args.timestamp_url,self.args.sign_tool_path)
+            self.report['authenticode_configuration']=authenticode('Inspect',
+                self.attempt/'authenticode-configuration.json',options=self.auth_options,
+                pwsh=self.pwsh,runner=self.runner.call,stage='authenticode-certificate-preflight')
+            configured=Path(self.args.security_python) if self.args.security_python else self.root/'.security-venv/Scripts/python.exe'
+            if not configured.is_file():
+                raise PipelineError('缺少固定版本的独立 SBOM 校验环境；请准备 .security-venv 或指定 -SecurityPython。')
+            self.security_python=_plain(configured).resolve()
+        self.vault=None
+        if not self.read_only_dry:
+            self.vault=find_vault(self.args.vault_directory,self.key_id,self.channel)
+            if self.vault.is_relative_to(self.root):raise PipelineError('正式密钥保险库必须在源码和运行目录之外。')
         self.notes=_plain(self.args.release_notes_file or self.root/'RELEASE_NOTES.md').resolve()
         if not self.notes.is_file():raise PipelineError('发布说明文件不存在。')
         self.old=_plain(self.args.old_release_dir).resolve() if self.args.old_release_dir else self.find_old()
@@ -430,9 +489,10 @@ class Pipeline:
                 or parse_version(_read_stamp(self.old)['app_version'])>=version):
             raise PipelineError('回退目录必须包含可用 EXE，且版本低于本次目标。')
         self.report['old_release_directory']=str(self.old)
-        self.command(self.pwsh,'-NoLogo','-NoProfile','-NonInteractive','-File',
-            self.root/'scripts/publisher_windows_vault.ps1','-Operation','Check','-VaultDirectory',self.vault,
-            '-KeyId',self.key_id,'-Python',self.python,stage='formal-vault-check',timeout=90,logs=False)
+        if not self.read_only_dry:
+            self.command(self.pwsh,'-NoLogo','-NoProfile','-NonInteractive','-File',
+                self.root/'scripts/publisher_windows_vault.ps1','-Operation','Check','-VaultDirectory',self.vault,
+                '-KeyId',self.key_id,'-Python',self.python,stage='formal-vault-check',timeout=90,logs=False)
         self.ci=self.github.ci(self.source_repo,commit,self.args.version,run_id=self.args.ci_run_id,
             wait_seconds=self.args.ci_wait_seconds)
         self.report['ci']=self.ci
@@ -466,17 +526,16 @@ class Pipeline:
             self.release=_plain(self.args.existing_release_dir).resolve()
             if self.directory.is_relative_to(self.release):raise PipelineError('运行目录不能位于既有发布目录中。')
             self.report['build']=dict(mode='reused-accepted-release',new_exe_built=False)
-            if not self.dry:
-                from scripts.ci_build_receipt import verify_receipt
-                receipt=self.release.parent/'verification/ci/build-attestation.json'
-                if not receipt.is_file():
-                    raise PipelineError('正式复用需要原 CI 目录及相邻的已证明构建收据；不能用本地验收替代来源验证。')
-                bound=verify_receipt(receipt,self.release,expected_version=self.args.version,
-                    expected_repository=self.source_repo,expected_commit=self.report['commit'],
-                    expected_run_id=self.ci['run_id'],expected_source_sha256=source_digest(self.root))
-                proof=verify_ci_provenance(self.github,self.source_repo,self.report['commit'],self.ci['run_id'],receipt,
-                    default_branch=self.source_info['default_branch'])
-                self.report['build'].update(byte_binding=bound,cryptographic_provenance=proof)
+            from scripts.ci_build_receipt import verify_receipt
+            receipt=self.release.parent/'verification/ci/build-attestation.json'
+            if not receipt.is_file():
+                raise PipelineError('复用需要原 CI 目录及相邻的已证明构建收据；不能用本地验收替代来源验证。')
+            bound=verify_receipt(receipt,self.release,expected_version=self.args.version,
+                expected_repository=self.source_repo,expected_commit=self.report['commit'],
+                expected_run_id=self.ci['run_id'],expected_source_sha256=source_digest(self.root))
+            proof=verify_ci_provenance(self.github,self.source_repo,self.report['commit'],self.ci['run_id'],receipt,
+                default_branch=self.source_info['default_branch'])
+            self.report['build'].update(byte_binding=bound,cryptographic_provenance=proof)
         else:
             self.event('verified-windows-ci-artifact')
             fetched=self.github.fetch_build(self.ci,self.source_repo,self.args.version,self.root,
@@ -484,6 +543,25 @@ class Pipeline:
             self.release=Path(fetched['release_directory'])
             self.report['ci']['artifact_verification']=fetched
             self.report['build']=dict(mode='passed-windows-ci-artifact',new_local_exe_built=False)
+        self.unsigned_release=self.release
+        self.report['unsigned_release_directory']=str(self.unsigned_release)
+        self.ci_sbom=self.directory/'ci-sbom'
+        self.report['sbom']=self.github.fetch_sbom(self.ci,self.source_repo,self.args.version,self.ci_sbom)
+        source_receipt=self.unsigned_release.parent/'verification/ci/build-attestation.json'
+        original_receipt=document(source_receipt)
+        original_generation=document(self.ci_sbom/'generation.json')
+        if (original_generation.get('receipt_sha256')!=_file_hash(source_receipt)
+                or document(self.ci_sbom/'inventory.json').get('release_files')!=original_receipt.get('files')):
+            raise PipelineError('原始 CI 收据、实际发布文件和已证明 SBOM 不属于同一构建，禁止签名。')
+        if not self.read_only_dry:
+            signed_release=self.directory/'authenticode-build'
+            auth=authenticode('Sign',self.attempt/'authenticode-signing.json',release=self.unsigned_release,
+                output=signed_release,options=self.auth_options,pwsh=self.pwsh,runner=self.runner.call,
+                stage='authenticode-sign-and-verify')
+            self.report['signing_derivation']=signing_derivation(self.unsigned_release,signed_release,
+                source_receipt,auth,self.attempt/'authenticode-derivation.json')
+            self.report['authenticode']=auth
+            self.release=signed_release
         identity=self.attempt/'runtime-identity.json'
         self.command(self.release/'MediaFlow.exe','--build-info',identity,stage='actual-exe-identity',timeout=120)
         runtime=document(identity);stamp=_read_stamp(self.release)
@@ -496,6 +574,10 @@ class Pipeline:
             stage='complete-release-structure',timeout=180)
         self.report['build'].update(build_id=stamp['build_id'],source_sha256=stamp['source_sha256'],
             exe_sha256=_file_hash(self.release/'MediaFlow.exe'),release_directory=str(self.release))
+        if self.read_only_dry:
+            self.report['authenticode']=authenticode('Inspect',self.attempt/'unsigned-authenticode.json',
+                release=self.release,mode='CI',pwsh=self.pwsh,runner=self.runner.call,stage='unsigned-authenticode-inspection')
+            return
         reports=[_plain(p).resolve() for p in self.args.acceptance_report]
         if reports and not self.args.existing_release_dir:raise PipelineError('新构建不能沿用旧验收报告。')
         if not reports:
@@ -519,8 +601,27 @@ class Pipeline:
             '-AcceptanceReceipt',receipt,'-PackageUrl',self.package_url,'-PublishedAt',datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
             '-ReleasePage','https://github.com/'+self.release_repo+'/releases/tag/v'+self.args.version,
             '-ReleaseNotesFile',self.notes,'-MinimumAppVersion',self.args.minimum_app_version,
+            '-CertificateThumbprint',self.args.certificate_thumbprint,
+            '-CertificateStore',self.args.certificate_store,'-TimestampUrl',self.args.timestamp_url,
+            '-SignToolPath',self.args.sign_tool_path,
             stage='formal-signing',timeout=1800,logs=False)
         self.validate_signed()
+        if not self.read_only_dry:
+            publication=self.directory/'publication-sbom'
+            self.command(self.security_python,'-B',self.root/'scripts/release_security.py','publication-sbom',
+                '--original-directory',self.ci_sbom,'--signed-release',self.release,
+                '--original-receipt',source_receipt,'--derivation',self.attempt/'authenticode-derivation.json',
+                '--manifest',self.signed/'release.json','--output',publication,
+                stage='signed-final-zip-sbom-validation',timeout=360)
+            final=document(publication/'publication-generation.json')
+            if final.get('passed') is not True or final.get('package')!=self.manifest['package']:
+                raise PipelineError('最终签后 SBOM 未能绑定真实 ZIP，禁止发布。')
+            self.report['publication_sbom']=final
+            self.report['publication_sbom_directory']=str(publication)
+            self.args.additional_asset += [str(publication/name) for name in
+                ('final-mediaflow.cdx.json','final-inventory.json','final-sbom-validation.json','publication-generation.json')]
+            # Rebuild the exact upload inventory with the verified sidecars.
+            self.validate_signed()
         self.report.update(signed_directory=str(self.signed),signed_manifest_sha256=_file_hash(self.signed/'release.json'))
         self.event('signed-package','passed',signature_verified=True,package=self.manifest['package'])
 
@@ -554,7 +655,9 @@ class Pipeline:
             self.report['source_tag'].update(exists=True,remote_exists=True,remote_commit=self.report['commit'])
         report=self.attempt/'github-publication.json'
         args=['-B',self.root/'scripts/publish_github_release.py','--gh',self.gh,'--repository',self.release_repo,
-            '--artifacts',self.signed,'--notes',self.notes,'--report',report,'--publish']
+            '--artifacts',self.signed,'--notes',self.notes,'--report',report,'--publish',
+            '--certificate-thumbprint',self.args.certificate_thumbprint,'--certificate-store',self.args.certificate_store,
+            '--timestamp-url',self.args.timestamp_url,'--sign-tool-path',self.args.sign_tool_path,'--pwsh',self.pwsh]
         for asset in self.args.additional_asset:args+=['--asset',asset]
         self.report['remote_writes']=True
         self.command(self.python,*args,stage='github-draft-upload-verify-publish',timeout=7200,
@@ -606,8 +709,39 @@ class Pipeline:
                 self.signed=_plain(self.report['signed_directory']).resolve()
                 if _file_hash(self.signed/'release.json')!=self.report['signed_manifest_sha256']:
                     raise PipelineError('恢复目录中的已签名清单发生变化。')
+                if not self.read_only_dry:
+                    from scripts.ci_build_receipt import verify_receipt
+                    unsigned=_plain(self.report.get('unsigned_release_directory','')).resolve()
+                    original=unsigned.parent/'verification/ci/build-attestation.json'
+                    verify_receipt(original,unsigned,expected_version=self.args.version,
+                        expected_repository=self.source_repo,expected_commit=self.report['commit'],
+                        expected_run_id=self.ci['run_id'],expected_source_sha256=source_digest(self.root))
+                    verify_ci_provenance(self.github,self.source_repo,self.report['commit'],self.ci['run_id'],original,
+                        default_branch=self.source_info['default_branch'])
+                    original_bom=self.directory/'ci-sbom'
+                    for name in ('mediaflow.cdx.json','inventory.json','generation.json','validation.json'):
+                        verify_ci_provenance(self.github,self.source_repo,self.report['commit'],self.ci['run_id'],original_bom/name,
+                            default_branch=self.source_info['default_branch'])
+                    fresh=authenticode('Verify',self.attempt/'resume-authenticode.json',release=self.release,
+                        options=self.auth_options,pwsh=self.pwsh,runner=self.runner.call,stage='resume-native-authenticode')
+                    signing_derivation(unsigned,self.release,original,fresh,self.attempt/'resume-signing-derivation.json')
+                    folder=_plain(self.report.get('publication_sbom_directory','')).resolve()
+                    final=document(folder/'publication-generation.json')
+                    if final!=self.report.get('publication_sbom') or final.get('passed') is not True:
+                        raise PipelineError('恢复需要原始签后 SBOM 验证证据；不会回退到未经验证的资产。')
+                    for name,field in (('final-mediaflow.cdx.json','final_sbom_sha256'),('final-inventory.json','final_inventory_sha256')):
+                        if _file_hash(folder/name)!=final[field]:raise PipelineError('签后 SBOM 证据已变化，停止恢复。')
+                    self.args.additional_asset += [str(folder/name) for name in
+                        ('final-mediaflow.cdx.json','final-inventory.json','final-sbom-validation.json','publication-generation.json')]
                 self.validate_signed()
             else:self.prepare()
+            if self.read_only_dry:
+                self.report.update(passed=True,finished_at=utc(),production_ready=False,
+                    dry_run_level='unsigned-build-and-native-sbom',formal_signed=False,
+                    formal_certificate='not_configured',signed_package_created=False,
+                    write_plan=dict(executed=False,operations=[],scope='Read-only rehearsal; no signing vault or publisher writes.'))
+                self.event('unsigned-dry-run-complete','passed')
+                return self.report
             self.publish()
             self.public_acceptance()
             self.report.update(passed=True,finished_at=utc())
@@ -623,7 +757,7 @@ class Pipeline:
                         self.report.update(published=True,release_url=actual['html_url'])
                 except Exception:pass
             self.report.update(passed=False,error_type=type(error).__name__,finished_at=utc(),
-                error=str(error) if isinstance(error,PipelineError) else '阶段未完成；保留本次证据、旧版本和远程资产。')
+                error=str(error) if isinstance(error,(PipelineError,ReleaseSecurityError)) else '阶段未完成；保留本次证据、旧版本和远程资产。')
             save(self.directory/'report.json',self.report)
             if isinstance(error,KeyboardInterrupt):raise
             raise PipelineError(self.report['error']) from None
@@ -639,8 +773,10 @@ def parser():
     for name in ('private-key-file','public-keys-file','key-id','password-env'):key.add_argument('--'+name,required=True)
     run=commands.add_parser('run')
     run.add_argument('--version',required=True);run.add_argument('--mode',choices=('dry-run','publish'),required=True)
-    for name in ('gh','pwsh','vault-directory','key-id','run-directory','existing-release-dir','old-release-dir','ci-run-id','release-notes-file'):
+    for name in ('gh','pwsh','vault-directory','key-id','run-directory','existing-release-dir','old-release-dir','ci-run-id','release-notes-file',
+                 'certificate-thumbprint','timestamp-url','sign-tool-path','security-python'):
         run.add_argument('--'+name,default='')
+    run.add_argument('--certificate-store',choices=('CurrentUser','LocalMachine'),default='CurrentUser')
     run.add_argument('--ci-wait-seconds',type=int,default=1200)
     run.add_argument('--minimum-app-version',default='2.0.1')
     run.add_argument('--acceptance-report',action='append',default=[])

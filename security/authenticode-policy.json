@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "product": "MediaFlow",
+  "first_party_pe": [
+    "MediaFlow.exe",
+    "tools/MediaFlow.Recycle.exe",
+    "tools/webview2/MediaFlow.WebView2Host.exe"
+  ],
+  "file_digest": "SHA256",
+  "timestamp_digest": "SHA256",
+  "timestamp_protocol": "RFC3161",
+  "production_requires_trusted_chain": true,
+  "production_requires_timestamp": true,
+  "ci_operation": "Inspect",
+  "ci_allows_unsigned": true,
+  "test_subject_prefix": "CN=MediaFlow Authenticode TEST ONLY",
+  "third_party_policy": "Record existing signatures; never re-sign or modify third-party files.",
+  "signing_output_policy": "A new independent output directory is mandatory; existing files and source trees are never signed in place.",
+  "configuration_state": "not_configured",
+  "certificate_source": "Windows CurrentUser/My or LocalMachine/My; explicit public certificate thumbprint; no PFX/password or private-key export interface."
+}

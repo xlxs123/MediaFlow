@@ -37,3 +37,11 @@
 程序更新部署到独立版本目录，不覆盖运行 EXE、旧版、媒体、恢复文件或浏览器配置。应用回退只启动经登记且摘要一致的旧程序；用户数据迁移仍经现有预览、确认、备份和验证流程，不自动倒退数据库。
 
 旧 2.0.1 尚无此 GitHub CDN 策略；首次采用新渠道需运行新客户端。新客户端对旧安装上下文的升级测试会明确列出真实运行版本，不把它冒充旧 EXE 自身已具备新能力。
+
+## Windows Authenticode 与原生 SBOM 门禁
+
+新的正式稳定发布要求 `-CertificateThumbprint`、`-CertificateStore`、已确认的 `-TimestampUrl`，可通过 `-SignToolPath` 选择经验证的 Windows SDK；`-SecurityPython` 指向安装固定 requirements-security 的独立校验环境（默认 `.security-venv/Scripts/python.exe`）。不传私钥、PFX 或密码。证书未配置时普通 CI 仍可构建，但正式 Publish 在打开 Ed25519 保险库前失败。
+
+无正式证书参数的 `-DryRun` 仅验证已证明 unsigned CI 构建、结构、原生 SBOM 和签名状态，不解锁保险库、不生成正式包、不写 GitHub；报告明确 `production_ready=false`。有正式证书的 DryRun 才完整演练签名与最终包，仍不发布。只读演练无签名恢复点；正式/完整演练 Resume 必须重新验证证书、原 CI/官方证明及最终文件。
+
+原 CI unsigned 收据/BOM/官方证明始终保留。签后采用仅三份第一方 PE 的载荷保留派生；最终 ZIP 形成后生成外部 SBOM sidecar 并关联其实际 SHA-256。第三方不重签，静态/托管依赖未知继续声明 incomplete。参见 [Authenticode 验证](AUTHENTICODE_VERIFICATION.md) 和 [原生 SBOM 覆盖](SBOM_COVERAGE_REPORT.md)。当前生产证书尚未配置，未发布新稳定版。
