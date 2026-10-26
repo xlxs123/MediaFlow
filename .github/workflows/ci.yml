@@ -94,10 +94,23 @@ jobs:
           & .\.venv\Scripts\python.exe -X utf8 -B tools\prepare_tools.py
           if ($LASTEXITCODE -ne 0) { throw 'Portable tools failed download or publisher checksum verification.' }
 
+      - name: Prepare isolated regression dependencies
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $testEnvironment = Join-Path $env:RUNNER_TEMP 'mediaflow-regression-venv'
+          python -m venv $testEnvironment
+          if ($LASTEXITCODE -ne 0) { throw 'Could not create the separate regression environment.' }
+          $testPython = Join-Path $testEnvironment 'Scripts/python.exe'
+          & $testPython -m pip install -r requirements-build.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned regression bootstrap failed.' }
+          & $testPython -m pip install -r requirements.txt -r requirements-security.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned application and schema-test dependencies failed.' }
+          ('MEDIAFLOW_TEST_PYTHON=' + $testPython) | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       - name: Update, signature, deployment and rollback regression
         run: |
           $ErrorActionPreference = 'Stop'
-          & .\.venv\Scripts\python.exe -X utf8 -B tests\run_update_tests.py --report-dir verification/ci/update
+          & $env:MEDIAFLOW_TEST_PYTHON -X utf8 -B tests\run_update_tests.py --report-dir verification/ci/update
           if ($LASTEXITCODE -ne 0) {
             foreach ($name in @('core', 'ui', 'output')) {
               $log = Join-Path 'verification/ci/update' ($name + '.txt')

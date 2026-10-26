@@ -66,3 +66,5 @@ Windows CI 在不接触正式密钥的普通 Job 中检查真实 unsigned PE/第
 原生 BOM 以真实物理文件及两个 CArchive 为依据，记录导入和延迟导入关系、版本和许可证据、system prerequisites 与明确缺口。新 CI 强制 `--require-native`；旧 schema 1 不会被当成原生扫描通过。官方 provenance 额外绑定 generation 和 Authenticode 安全摘要，仍仅由默认分支无项目命令的特权 Job 创建。
 
 结果及证据层次分别见 [Authenticode](../AUTHENTICODE_VERIFICATION.md)、[SBOM 覆盖](../SBOM_COVERAGE_REPORT.md)。本地签后 BOM 是受限制的独立派生，不冒称被原 CI attestation 签署；普通 SHA-256 不等于数字签名。
+
+回归测试使用 RUNNER_TEMP 下的独立环境，包含固定应用与 schema 测试依赖；应用 .venv 仅安装运行/构建依赖，.security-venv 仍独立验证最终 SBOM。测试工具不会因此混入应用构建环境。

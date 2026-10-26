@@ -20,6 +20,7 @@ scripts/sign_windows.ps1
 scripts/validate_sbom.py
 scripts/verify_windows_signature.ps1
 security/authenticode-policy.json
+security/codeql-reviews.json
 security/native-component-evidence.json
 security/sbom-policy.json
 security/secret-exceptions.json

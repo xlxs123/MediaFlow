@@ -16,10 +16,10 @@
         "core/update_channel.py": "cdbf22f6a503795f30b2a07017e8b12b453f2a9a55c1f468f9562209a265cecb",
         "core/update_manifest.py": "e043e5f1aba9b0a13334f58fb1f1b142e5ca7eca6dc05887bc8eb4cb95b327ed",
         "scripts/configure_update_channel.py": "8da04df5cd7365eeb5f4ed78d70ee4d0234e15c7921dd5967717e3ce89357ad1",
-        "scripts/publish_release.py": "3efaf7b6e193c965f95c147886649567d21303f0c5e390bfcd55f89e09de1117",
+        "scripts/publish_release.py": "dd4d1e07aea94ea9c763eecfd740d9187c3ac792f7e11365faef259fc2f7cade",
         "utils/build_info.py": "b4f485d86dc6ac924d85e6fedba8cc5c732feeae46578b2dce4961575465d38f"
       },
-      "reason": "Only explicitly confirmed public verification material reaches this writer. configure requires the input object to contain only trusted_keys, validates exact Ed25519/RSA public field sets, confirms the public fingerprint, and validates the stable channel schema. Private fields and unknown fields are rejected; publishing public verification keys is required for client signature verification.",
+      "reason": "Only explicitly confirmed public verification material reaches this writer. configure requires the input object to contain only trusted_keys, validates exact Ed25519/RSA public field sets, confirms the public fingerprint, and validates the stable channel schema. Private fields and unknown fields are rejected; publishing public verification keys is required for client signature verification. Re-reviewed against run 40256211022: all four complete flows, location and fingerprints are unchanged; the bounded public JSON reader/hash helpers are unchanged from 510a9da. Only the whole publisher module hash changed for native signing gates.",
       "reviewed_by": "Codex exact source-to-sink public verification metadata review",
       "primary_location": {
         "path": "scripts/configure_update_channel.py",
@@ -30,10 +30,10 @@
         }
       },
       "evidence": {
-        "source_sarif_sha256": "da903b0f020b5f66e2bb4f8dd85fd750a09e1ce8790497eaf1c52b696471ef87",
-        "source_commit": "94cae998c5a0e5203d06d0274d6e2935c5e5f0d3",
-        "codeql_run": "40151743924",
-        "source_url": "https://github.com/xlxs123/MediaFlow/actions/runs/40151743924",
+        "source_sarif_sha256": "b5ea5f68e80380ca8c4013e872a9ea6f664a54f43667f73525131c019bba0ed8",
+        "source_commit": "1022031c26cd659d9f6efd674a2d7a5af80c2fea",
+        "codeql_run": "40256211022",
+        "source_url": "https://github.com/xlxs123/MediaFlow/actions/runs/40256211022",
         "original_primary_location": {
           "path": "scripts/configure_update_channel.py",
           "region": {
