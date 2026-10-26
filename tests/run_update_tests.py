@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import io
 import json
 import os
 from pathlib import Path
@@ -17,6 +16,7 @@ sys.path.insert(0, str(ROOT))
 
 from core.process_tree import ProcessTree, NO_WINDOW
 from utils.build_info import source_digest
+from tests.regression_progress import ProgressLog, wait_for_descendants_exit, progress_summary, result_type
 
 GROUPS = {
     'core': ['test_update_manifest', 'test_update_ed25519', 'test_update_manager',
@@ -28,7 +28,8 @@ GROUPS = {
              'test_ci_build_receipt', 'test_release_pipeline', 'test_accept_release_update',
              'test_dependency_audit', 'test_secret_scan', 'test_sbom', 'test_security_gate', 'test_security_tools',
              'test_codeql_reviews', 'test_fixture_security', 'test_public_metadata_contract',
-             'test_authenticode', 'test_release_security', 'test_native_sbom', 'test_sbom_validation'],
+             'test_authenticode', 'test_release_security', 'test_native_sbom', 'test_sbom_validation',
+             'test_package_paths', 'test_regression_progress'],
     'ui': ['test_update_ui'],
     'output': ['test_output_integration'],
 }
@@ -36,16 +37,31 @@ GROUPS = {
 
 def worker(group, directory):
     before = source_digest(ROOT)
+    directory.mkdir(parents=True, exist_ok=True)
+    progress = ProgressLog(directory / (group + '.progress.jsonl'), ROOT)
+    progress.event('suite_load_start', group=group, pid=os.getpid(),
+        gitleaks_configured=bool(os.environ.get('MEDIAFLOW_GITLEAKS')))
+    if group == 'core' and not os.environ.get('MEDIAFLOW_GITLEAKS'):
+        progress.event('configuration_failed', error='MEDIAFLOW_GITLEAKS_required')
+        progress.close()
+        raise RuntimeError('MEDIAFLOW_GITLEAKS must identify the pinned real scanner before regression starts.')
     suite = unittest.defaultTestLoader.loadTestsFromNames(['tests.' + name for name in GROUPS[group]])
-    stream = io.StringIO()
+    progress.event('suite_load_end', tests=suite.countTestCases())
     # Legacy fixtures describe an unconfigured installation. They must not
     # contact the publisher merely because an operator approved a build channel.
     # Channel-specific cases explicitly inject approved roots; native acceptance
     # always reads the real resource embedded in the final EXE.
     empty = {'schema_version': 1, 'product': 'MediaFlow', 'channel': 'stable',
              'source_url': '', 'trusted_keys': {}, 'key_state': 'pending'}
-    with patch('core.update_manager.load_channel', return_value=empty):
-        result = unittest.TextTestRunner(stream=stream, verbosity=2).run(suite)
+    try:
+        with (directory / (group + '.txt')).open('x', encoding='utf-8', buffering=1) as stream:
+            with patch('core.update_manager.load_channel', return_value=empty):
+                result = unittest.TextTestRunner(stream=stream, verbosity=2,
+                    resultclass=result_type(progress)).run(suite)
+        progress.event('suite_end', passed=result.wasSuccessful(), tests=result.testsRun,
+                       failures=len(result.failures), errors=len(result.errors), skipped=len(result.skipped))
+    finally:
+        progress.close()
     value = {'passed': result.wasSuccessful(), 'group': group, 'tests': result.testsRun,
         'failures': len(result.failures), 'errors': len(result.errors), 'skipped': len(result.skipped),
         'source_sha256': before, 'source_unchanged': before == source_digest(ROOT),
@@ -55,8 +71,6 @@ def worker(group, directory):
         'test':'tests.test_public_source_audit.PublicSourceAuditTests.test_worktree_symlink_is_never_followed',
         'reason':'Creating symlinks is not permitted for this test user'}]
     value['passed'] = value['passed'] and not value['unexpected_skips']
-    directory.mkdir(parents=True, exist_ok=True)
-    (directory / (group + '.txt')).write_text(stream.getvalue(), 'utf-8')
     (directory / (group + '.json')).write_text(json.dumps(value, indent=2), 'utf-8')
     print(json.dumps(value))
     return 0 if value['passed'] and value['source_unchanged'] else 1
@@ -69,6 +83,9 @@ def run(directory):
     for group in GROUPS:
         tree = None
         started = time.monotonic()
+        timed_out = False
+        remaining_children = None
+        enumeration_error = None
         with (directory / (group + '.stdout.log')).open('w', encoding='utf-8') as stdout, \
                 (directory / (group + '.stderr.log')).open('w', encoding='utf-8') as stderr:
             process = subprocess.Popen([sys.executable, '-B', str(Path(__file__).resolve()),
@@ -84,16 +101,26 @@ def run(directory):
                 while process.poll() is None and time.monotonic() - started < timeout:
                     time.sleep(.1)
                 if process.poll() is None:
+                    timed_out = True
                     tree.terminate()
                 exit_code = process.wait(timeout=10)
             finally:
                 if tree:
                     tree.close()
+                try:
+                    remaining_children = wait_for_descendants_exit(process.pid)
+                except OSError as error:
+                    enumeration_error = dict(type=type(error).__name__, winerror=getattr(error, 'winerror', None))
         file = directory / (group + '.json')
         value = json.loads(file.read_text('utf-8')) if file.is_file() else {
             'group': group, 'tests': 0, 'failures': 0, 'errors': 1, 'skipped': 0, 'passed': False}
         value.update(exit_code=exit_code, elapsed_seconds=round(time.monotonic()-started, 3))
+        value.update(timed_out=timed_out, timeout_seconds=timeout,
+            progress=progress_summary(directory / (group + '.progress.jsonl')),
+            remaining_owned_children=remaining_children, process_enumeration_error=enumeration_error)
         value['passed'] = value['passed'] and exit_code == 0 and value.get('source_sha256') == before
+        if timed_out or remaining_children or (os.name == 'nt' and remaining_children is None):
+            value['passed'] = False
         groups.append(value)
         if not value['passed']:
             break

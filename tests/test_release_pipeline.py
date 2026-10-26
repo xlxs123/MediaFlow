@@ -92,6 +92,19 @@ class PipelineTests(unittest.TestCase):
             with self.assertRaisesRegex(p.PipelineError,'不干净'):pipeline.run()
         self.assertTrue(all('publisher_windows_vault.ps1' not in a for args,_,_ in pipeline.runner.calls for a in args))
         self.assertFalse((pipeline.directory/'.pipeline.lock').exists())
+        end=[row for row in pipeline.report['events'] if row['stage']=='preflight'][-1]
+        self.assertEqual(end['status'],'failed')
+        self.assertGreaterEqual(end['elapsed_seconds'],0)
+
+    def test_command_records_a_terminal_status_and_never_accepts_nonzero_exit(self):
+        pipeline=self.pipeline()
+        with patch.object(pipeline.runner,'call',return_value=(0,b'unit',b'')):
+            self.assertEqual(pipeline.command('unit',stage='successful'),b'unit')
+        with patch.object(pipeline.runner,'call',return_value=(17,b'',b'')):
+            with self.assertRaises(p.PipelineError):pipeline.command('unit',stage='failed-child')
+        ends=[row for row in pipeline.report['events'] if row['status']!='running']
+        self.assertEqual([(row['stage'],row['status']) for row in ends], [('successful','passed'),('failed-child','failed')])
+        self.assertTrue(all(row['elapsed_seconds']>=0 for row in ends))
 
     def test_same_published_version_publish_fails_before_key_or_asset_writes(self):
         pipeline=self.pipeline('publish')
@@ -224,6 +237,14 @@ class PipelineTests(unittest.TestCase):
         with self.assertRaisesRegex(p.PipelineError,'超时'):
             runner.call([sys.executable,'-B','-c','import time; time.sleep(30)'],'timeout-unit',timeout=.2,logs=False)
         self.assertLess(time.monotonic()-started,10)
+
+    def test_timeout_retains_partial_logs_and_never_marks_the_stage_passed(self):
+        runner=p.Runner(self.root,self.base)
+        program='import sys,time; print("owned-stage-start",flush=True); print("owned-diagnostic",file=sys.stderr,flush=True); time.sleep(30)'
+        with self.assertRaisesRegex(p.PipelineError,'timeout-retain'):
+            runner.call([sys.executable,'-B','-c',program],'timeout-retain',timeout=1,logs=True)
+        self.assertIn(b'owned-stage-start',(self.base/'timeout-retain.stdout.log').read_bytes())
+        self.assertIn(b'owned-diagnostic',(self.base/'timeout-retain.stderr.log').read_bytes())
 
 
 class GitHubGateTests(unittest.TestCase):

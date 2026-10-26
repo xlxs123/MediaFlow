@@ -33,9 +33,14 @@ class PackageError(RuntimeError):
 def _plain(path):
     path = Path(path).expanduser().absolute()
     for part in (path, *path.parents):
-        info = part.lstat() if part.exists() or part.is_symlink() else None
-        if info and (stat.S_ISLNK(info.st_mode)
-                     or getattr(info, 'st_file_attributes', 0) & 0x400):
+        try:
+            info = part.lstat()
+        except FileNotFoundError:
+            # New outputs may be absent; still inspect every ancestor. Do not
+            # treat access errors or non-directory ancestors as safe absence.
+            continue
+        if (stat.S_ISLNK(info.st_mode)
+                or getattr(info, 'st_file_attributes', 0) & 0x400):
             raise PackageError('发布路径含链接或重解析点，已停止打包。')
     return path
 

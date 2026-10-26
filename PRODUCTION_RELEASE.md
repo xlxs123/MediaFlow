@@ -45,3 +45,5 @@
 无正式证书参数的 `-DryRun` 仅验证已证明 unsigned CI 构建、结构、原生 SBOM 和签名状态，不解锁保险库、不生成正式包、不写 GitHub；报告明确 `production_ready=false`。有正式证书的 DryRun 才完整演练签名与最终包，仍不发布。只读演练无签名恢复点；正式/完整演练 Resume 必须重新验证证书、原 CI/官方证明及最终文件。
 
 原 CI unsigned 收据/BOM/官方证明始终保留。签后采用仅三份第一方 PE 的载荷保留派生；最终 ZIP 形成后生成外部 SBOM sidecar 并关联其实际 SHA-256。第三方不重签，静态/托管依赖未知继续声明 incomplete。参见 [Authenticode 验证](AUTHENTICODE_VERIFICATION.md) 和 [原生 SBOM 覆盖](SBOM_COVERAGE_REPORT.md)。当前生产证书尚未配置，未发布新稳定版。
+
+证书配置前检查、公开参数和未验收边界见 [正式签名就绪](SIGNING_READINESS.md)。本机只读演练的超时诊断与实时日志入口见 [DryRun 根因报告](DRYRUN_TIMEOUT_ANALYSIS.md)；配置检查不能代替实际私钥操作或 RFC 3161 服务验收。

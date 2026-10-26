@@ -1514,12 +1514,12 @@
     },
     {
       "path": "tests/test_release_pipeline.py",
-      "sha256": "4f293fe1366965d75b1cb364d511588f65038d4b5b79008793a654668d6c60a9",
+      "sha256": "970610f301a261713a72b825aed8df319f6fd58f60c30e52e8620803416b7749",
       "classification": "synthetic_test_data",
-      "reviewed_by": "Codex exact staged-source review; baseline 510a9da comparison",
-      "reason": "复核完整测试文件；此行仍为与基线相同的 unit-secret 合成环境夹具，仅验证子进程剥离密码/私钥环境变量。新增测试覆盖缺证书 DryRun 不访问保险库及恢复拒绝，不含真实凭据。",
+      "reviewed_by": "Codex exact staged-source review; DryRun timeout baseline 80a895ad comparison",
+      "reason": "精确复核既有 safe_environment 负例：硬编码值仅为 unit-secret 合成字串，与80a895ad基线同一字典行逐字节相同；新增测试只验证超时日志和阶段终态，没有使用真实认证材料。保留原环境清除安全断言。",
       "reviewed_lines": [
-        210
+        223
       ],
       "reviewed_rules": [
         "credential_literal"

@@ -139,7 +139,9 @@ def _read_bound(path, expected):
     if not path.is_file() or not 0 <= expected['size'] <= MAX_FILE:
         raise NativeSBOMError('Native source is absent or outside the bounded read policy.')
     with frozen_file(path) as stream:
-        data = stream.read(MAX_FILE + 1)
+        # The receipt already supplies the exact length. Read one extra byte to
+        # detect growth without allocating the global ceiling for tiny files.
+        data = stream.read(expected['size'] + 1)
     if len(data) != expected['size'] or sha256(data) != expected['sha256']:
         raise NativeSBOMError('Actual file bytes differ from the receipt-bound inventory.')
     return data
