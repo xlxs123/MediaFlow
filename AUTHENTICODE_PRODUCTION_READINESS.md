@@ -41,6 +41,6 @@ if ($LASTEXITCODE -ne 0) { throw '正式配置未通过，禁止生产签署。'
 
 不要用虚构指纹或示例地址补齐配置。configuration-only 检查通过仍不证明私钥操作成功；`HasPrivateKey` 不等于 KSP/HSM 已实测。时间戳 URL 仅为 `configured_not_probed`，不能声称 TSA 协议通过。正式签署仍必须验证系统链、Online 撤销、精确 signer、Get-AuthenticodeSignature、SignTool、WinVerifyTrust 和与 signer 绑定的 RFC3161 token。
 
-同提交默认分支官方证明与原 CI 收据/SBOM通过后，才在新树签固定三个第一方 PE；第三方不重签。最终ZIP重新提取三个PE并做Production验签，再进入已有Ed25519发布路径。测试证书、官方来源证明和SHA-256各有职责，不能替代发行者正式Authenticode。
+同提交默认分支官方证明与原 CI 收据/SBOM通过后，才在新树签固定三个第一方 PE；第三方不重签。实际顺序为：签后目录Production验签→生成最终ZIP及Ed25519清单→从最终ZIP重新提取三个PE做Production验签→允许创建草稿或上传。目录验签在读取正式Ed25519私钥之前；最终ZIP验签则在远程发布写入之前。测试证书、官方来源证明和SHA-256各有职责，不能替代发行者正式Authenticode。
 
 参见 [本轮验收](AUTHENTICODE_ACCEPTANCE_REPORT.md)、[产物一致性](FINAL_PACKAGE_INTEGRITY_REPORT.md)。测试证书参数依据 [Microsoft 文档](https://learn.microsoft.com/en-us/powershell/module/pki/new-selfsignedcertificate)；公钥-only夹具仅保存公开证书的RawData，见 [X509Certificate2](https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.x509certificates.x509certificate2)。没有导出测试私钥或添加信任根。

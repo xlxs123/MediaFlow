@@ -2,6 +2,8 @@
 
 正式证书未配置：`formal_signed=false, production_ready=false, published=false`。不存在本阶段的正式签名者指纹或正式签名包；没有修改v2.1.0正式资产、更新URL或可信公钥。
 
+`MODIFIED_FILES.txt`仅列相对本阶段基线`368f1f00`的五个路径，不是`80a895ad`以来的历史累计清单；旧提交与报告保留。
+
 ## PR #10 收尾
 
 重新查询实际状态：PR开放、非草稿、可合并，head `14ca8eeac286ffcefcc3c35436e180edda565017`，只改两份报告。所有必需检查通过；官方证明Job对PR事件按既有策略跳过，不冒称已生成证明。main没有生效的保护规则或强制审阅要求，没有未解决审阅线程。报告与本机JSON及真实CI一致，使用普通merge合并为 `368f1f00f6cb2c6a97895c1ef34fb3c2930736f1`，未管理员绕过或伪造审批。
