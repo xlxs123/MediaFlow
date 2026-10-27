@@ -8,7 +8,9 @@
 - 本机 SDK SignTool 10.0.22621.3233 的 Microsoft Windows 签名有效；工具可用仅证明工具身份。
 - 缺少正式 thumbprint 的 `Inspect -Mode Production` 必须以 `certificate_not_configured` 非零结束。不存在的 thumbprint、格式非法、测试/自签名、错误 EKU、过期、无私钥或链/撤销不可验证均不能满足生产门禁。
 - 配置专用报告明确 `configuration_only=true`、`private_key_operation_tested=false`、`timestamp_service_protocol_tested=false`。URL 形态通过仅标记 `configured_not_probed`，没有实际 TSA 服务成功的声明。
-- 本机已执行 Authenticode 参数与拒绝路径测试；正式签名集成只能由配置后的真实发行环境完成。隔离测试证书集成的真实 CI 结果见最终验收记录，不能外推为生产可用。
+- 本机已执行 Authenticode 参数与拒绝路径测试；正式签名集成只能由配置后的真实发行环境完成。同提交[真实Windows CI](https://github.com/xlxs123/MediaFlow/actions/runs/40432991674)的506项回归零失败/零错误/零跳过，并另行通过10项隔离TEST ONLY证书集成；原始PE及Root信任库保持、私钥未导出。该集成结果文件的官方证明也已在本机验证，不能外推为生产证书可用。
+
+2026-10-27完整本机只读DryRun实际通过，退出0、596.894秒，506项增量零失败/零错误，1项既定本机符号链接权限跳过；没有保险库/正式签署步骤或签名输出。所有必需阶段有终态、无残留后代。对应代码 `f6227021543e8154bc035887a98c429db6f5a9a0`，正式证书仍未配置，`formal_signed=false,production_ready=false`。完整命令、阶段耗时、失败历史和CI/本机分层证据见 `DRYRUN_TIMEOUT_ANALYSIS.md`。
 
 ## 复用的安全门禁
 
@@ -22,7 +24,7 @@
 | 独立验签 | 实际 embedded signer、预期 thumbprint、Get-AuthenticodeSignature、SignTool `/pa /all /v /tw` 和 WinVerifyTrust 都必须成功；目录签名不足以替代嵌入签名 |
 | 载荷完整性 | 原 unsigned CI 收据/证明保留，仅允许三份 PE 经审核的 checksum/security directory/certificate append 差异；其余载荷及第三方必须一致 |
 | 最终产物绑定 | 签后独立 SBOM 派生、最终 ZIP 大小和 SHA-256、Ed25519 清单及 ZIP 内三个实际 PE 的验签保持一致 |
-| 发布顺序 | 同提交安全工作流、官方来源证明和正式证书检查通过后，才允许既有 DPAPI 保险库发布路径；普通 CI 没有生产私钥 |
+| 发布顺序 | 同提交安全工作流、官方来源证明和正式证书检查通过后，才允许既有 DPAPI 保险库的正式 Publish 签包操作。配置检查 Check 的解密/核钥先于CI产物证明，不执行签包；本轮只读DryRun两者均跳过。普通 CI 没有生产私钥 |
 
 实现入口仍为 `scripts/authenticode.ps1`、`scripts/authenticode_native.cs`、`scripts/release_security.py` 和现有发布器，没有建立第二套签名系统。
 
