@@ -47,8 +47,10 @@
 | 路径/实时进度/发布器针对性回归 | 39 项；0 失败/0 错误/0 跳过；3.174 秒 | 是新增诊断拒绝路径验证，不冒充生产签名 |
 | 原生产构建 SBOM 只读重算 | 440 PE、240 缺口，全部 native 字段相等；CycloneDX 独立验证通过；20.1214 秒 | 使用既有 b806c405 构建，未冒充本补丁构建 |
 | 本机完整组回归 r2 | core 475 / UI 17 / output 12；504 项；0 失败/0 错误/1 环境跳过；core 父进程398.250秒 | 最后两行只读阶段事件另跑21项发布器测试通过 |
-| 本机完整只读 DryRun | 两次真实运行分别中断于产物下载、失败于SBOM专用读取边界，均未记成功；详见下节 | 后者core475用时275.568秒，504项均通过；完整成功仍待修补后的同提交CI及再次演练 |
-| 本阶段真实远程 CI | [PR #7 Windows](https://github.com/xlxs123/MediaFlow/actions/runs/40337701656)、[main Windows/官方证明](https://github.com/xlxs123/MediaFlow/actions/runs/40339381120)均504项0失败/0错误/0跳过；[main安全工作流](https://github.com/xlxs123/MediaFlow/actions/runs/40339380942)全部通过 | 证明对象是25e6d123，不冒充后续修补提交 |
+| 最终本机完整只读 DryRun r3 | **退出0，通过，596.894秒**；core477/UI17/output12共506项，0失败/0错误/1既定环境跳过；三组及外层后代进程均为空 | 代码与证明同为f622702；core套件263.8191秒、含启动父层264.664秒；预算仍900秒 |
+| 本阶段真实远程 CI | 最终[Windows/官方证明](https://github.com/xlxs123/MediaFlow/actions/runs/40432991674)506项0失败/0错误/0跳过；[安全工作流](https://github.com/xlxs123/MediaFlow/actions/runs/40432991740)四Job全部通过 | [PR #7](https://github.com/xlxs123/MediaFlow/pull/7)、[PR #9](https://github.com/xlxs123/MediaFlow/pull/9)分别经检查/审查后正常合并；没有管理员绕过 |
+| 测试证书集成 | 同一真实CI产物中的10项集成均通过，原PE及信任根保持，私钥未导出；该结果文件也通过官方证明验证 | 明确TEST ONLY且不受信任；formal_signed=false，不是正式证书验收 |
+| 最终独立产物复核 | 本机重新解析同一实际产物、CycloneDX严格验证及10对象官方证明验证通过，87.617秒；457组件、440 PE、240缺口，gap/relations与基线一致 | 在完整演练后另行执行，不将耗时或测试轮次相加 |
 | 正式证书/生产发布 | 未配置 / 未验收 | `production_ready=false` |
 
 唯一允许的本机跳过为 `test_worktree_symlink_is_never_followed`：当前用户不允许创建符号链接。真实 Gitleaks 不能跳过。完整失败现场与本阶段 JSONL、pstats、逐项文本、分配实验、独立审查记录保存在项目父目录的 `.mediaflow-dryrun-readiness-task`；不提交本机路径、环境快照或原始认证材料。
@@ -64,20 +66,60 @@
 
 最小修补仅让**已取得并验证官方证明的该SBOM索引**显式使用既有32MiB上限，普通清单和收据仍默认2MiB。继续使用同一冻结读取、重复字段/非有限数字/非对象拒绝逻辑，不改路径约束、签名和来源门禁。新增真实大文件边界测试，覆盖2MiB普通读取拒绝、32MiB专用读取接受、超上限及非法JSON拒绝。针对性路径/发布器31项零失败、零错误、零跳过。没有将这次失败重标成功，也没有跳过后续完整演练。
 
+该修补提交 `da5a6c89db80aaa5e3c3fbb42c7719a3c6eecf97` 经[PR #9 Windows](https://github.com/xlxs123/MediaFlow/actions/runs/40432078026)506项零失败/零错误/零跳过、全部安全检查和主代理逐行审查后正常合并为 `f6227021543e8154bc035887a98c429db6f5a9a0`。初始性能及诊断补丁有独立代理审查记录；这次专用读取补丁的额外审查是主代理审查，不混称独立审查。
+
+## 最终完整演练实测（2026-10-27）
+
+代码与CI均为 `f6227021543e8154bc035887a98c429db6f5a9a0`，run `40432991674`，工作区保持干净。运行目录为 `.release-runs/dryrun-readiness-20261027-r3`，没有恢复或覆盖前两次目录。全部阶段都有开始和成功终态；命令阶段实际退出0，函数阶段没有虚构独立OS退出码。
+
+| 必需阶段 | 实际秒数 | 结果 |
+| --- | ---: | --- |
+| 前置配置、同提交安全工作流及CI检查 | 16.7896 | 通过 |
+| 源码披露审核 | 6.6940 | 通过，402文件、0待审 |
+| 必要增量测试 | 270.4037 | 通过，506项；core477/UI17/output12 |
+| 下载、完整摘要/收据和官方构建来源验证 | 218.2436 | 通过 |
+| 原生SBOM及官方证明/原收据绑定 | 42.4581 | 通过，实际大索引按专用边界读取 |
+| 实际打包EXE身份启动 | 22.7759 | 退出0，对应真实版本/源码/构建 |
+| 完整发布结构 | 1.7142 | 退出0 |
+| unsigned Authenticode状态检查 | 15.8748 | 退出0，仅检查，未正式签署 |
+
+外层实际退出0，总596.894秒，`remaining_owned_children=[]`。报告级 `production_ready=false`、`formal_signed=false`、`signed_package_created=false`、`published=false`、`remote_writes=false`，签名输出目录不存在，没有保险库/正式签署阶段。未把unsigned检查当成生产就绪。
+
+本轮CI构建artifact为371,376,819字节，SHA-256 `7839bb08761b856319c3f61735e8b515629c2b54ddcb76c58304405c7e77811b`。SBOM artifact为489,522字节，SHA-256 `658ddee5560c52caca712d249314e97bf0e388a32b534c0ac52ea67e56919b18`，可从[真实CI的SBOM产物](https://github.com/xlxs123/MediaFlow/actions/runs/40432991674/artifacts/12702329132)查看（GitHub可能要求登录）。这些是验收用unsigned CI产物，没有上传成正式Release资产。
+
+本机完整历史扫描单独执行：Gitleaks8.30.1，all refs+精确index，25提交、523历史文件版本、402暂存文件、0阻断。它与core中的真实扫描器夹具分别记录；没有声称fixture扫描等于主仓库全历史扫描。扫描的refs/index摘要保存在私有JSON，后续报告提交不伪称已包含在这一时点扫描中；报告PR仍走完整远程安全工作流。
+
+完整本机证据包括：父目录 `.mediaflow-dryrun-readiness-task/dryrun-command-r3.json`（实际argv/工作目录与选定非敏感环境配置）、`dryrun-wrapper-r3.json`、`final-build-evidence-r3.json`、`secrets-final-main-r1/report.json`；工作区运行目录中的 `report.json` 与 `attempt-f4da86dce7/unit/results.json`、三个 `*.progress.jsonl` 和逐项文本。每个用例有UTC开始/结束、真实耗时与逻辑结果码；每组另有真实OS退出码。旧失败文件、部分下载、锁与本轮所有诊断均保留。
+
+## 稳定版本及边界保持
+
+结束时真实API/匿名清单复核确认：v2.1.0仍为13个原资产，ID/名称/大小/digest、来源标签和稳定清单字节摘要均与开始时一致。渠道文件SHA-256仍为 `fd817c8ecd76b8dc9a4e8f341c1ba649b83a5a4bd15ed6af90cf5ae562ceeea9`；匿名正式清单SHA-256仍为 `580c204f3048c3443f51c6199ee25a62bb9f88d158cdced832bc41ae6632bf44`。现有客户端传输/验签代码实测该公网清单签名有效、篡改后拒绝；没有把这一小清单检查说成新版本发布或重新进行整包公网部署验收。
+
+原白名单1519个静态文件、2,509,943,319字节重新完整哈希，全部与旧快照一致；未枚举用户数据。保留的2.0.1实际EXE执行 `--build-info` 退出0，未将其冒充完整GUI或网站下载回归。没有扫描浏览器登录数据、清理/移动用户文件、修改媒体下载核心、更新URL、公钥或v2.1.0资产。
+
+`MODIFIED_FILES.txt` 按本轮起始80a895ad基线列出全部16个改动路径，而非将两次实现PR和报告PR的文件数重复相加。正式证书未配置、真实私钥操作和TSA服务协议仍未验收；240项识别缺口不是漏洞计数，静态/托管/系统传递依赖仍不完整。原900秒现场缺少逐项日志，不能精确还原其所有额外等待；本轮确认并修补的热点及完整演练通过是不同层次的证据。
+
 ## 执行方式与顺序约束
 
 先在独立分支完成本地针对性测试和审查，推送 PR 并等待真实安全/Windows 检查。现有生产来源门禁只接受**同提交、默认分支**的 GitHub 官方构建证明；不能在未合并 PR 上用旧 main 的证明冒充。保持该门禁，在检查、审查及正常合并流程完成后，才能对同一 main 提交执行完整发布 DryRun。
 
-以下参数来自本机实际执行入口；工具位置由本地变量明确提供。`$run` 必须是当前工作区 `.release-runs` 内尚不存在的新子目录；不复用或覆盖旧报告。最终结果和确切 run ID 将随实际验收记录补充。
+以下为最终实际执行配置，以项目父目录变量代替机器盘符；完整解析后的原始argv保存在私有命令记录中。原运行目录现已存在，**不要原样重跑覆盖它**；再次演练应选择新的独立子目录。
 
 ```powershell
-$env:MEDIAFLOW_GITLEAKS = $pinnedGitleaks
-$env:MEDIAFLOW_AUTH_TEST_ROOT = $newPrivateAuthCaseDirectory
+$workspace = (Get-Location).Path
+$projectParent = Split-Path -Parent $workspace
+$testPython = Join-Path $projectParent '.mediaflow-security-hardening-task/security-venv/Scripts/python.exe'
+$verifiedGh = Join-Path $projectParent '.mediaflow-2.1.0-task/github-cli/portable/bin/gh.exe'
+$env:MEDIAFLOW_GITLEAKS = Join-Path $projectParent '.mediaflow-security-hardening-task/tools/gitleaks/windows-x64/gitleaks.exe'
+$env:MEDIAFLOW_AUTH_TEST_ROOT = Join-Path $projectParent '.mediaflow-dryrun-readiness-task/dryrun-auth-cases-r3'
+$env:PYTHONIOENCODING = 'utf-8'
+$env:PYTHONDONTWRITEBYTECODE = '1'
 $env:QT_QPA_PLATFORM = 'offscreen'
-& $testPython -B tests/run_update_tests.py --report-dir $newPrivateTestDirectory
+$preservedOldRelease = Join-Path $projectParent 'm3u8-downloader-2.0.1/dist-mediaflow-2.0.1'
+$run = Join-Path $workspace '.release-runs/dryrun-readiness-20261027-r3'
 & pwsh -NoLogo -NoProfile -NonInteractive -File scripts/release_mediaflow.ps1 `
   -Version 2.1.0 -DryRun -Python $testPython -SecurityPython $testPython `
-  -Gh $verifiedGh -CiRunId $sameMainCommitRun -CiWaitSeconds 1 `
+  -Gh $verifiedGh -CiRunId 40432991674 -CiWaitSeconds 1 `
   -OldReleaseDirectory $preservedOldRelease -RunDirectory $run
 ```
 
