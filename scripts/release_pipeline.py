@@ -58,8 +58,8 @@ def save(path, value):
     os.replace(temporary,path)
 
 
-def document(path):
-    return _read_document(path)[0]
+def document(path, *, maximum=2*1024*1024):
+    return _read_document(path,maximum)[0]
 
 
 def safe_environment(env=None):
@@ -569,8 +569,10 @@ class Pipeline:
         source_receipt=self.unsigned_release.parent/'verification/ci/build-attestation.json'
         original_receipt=document(source_receipt)
         original_generation=document(self.ci_sbom/'generation.json')
+        # The authenticated per-PE inventory uses the independent SBOM reader's
+        # 32 MiB policy. Ordinary update/receipt JSON retains its 2 MiB default.
         if (original_generation.get('receipt_sha256')!=_file_hash(source_receipt)
-                or document(self.ci_sbom/'inventory.json').get('release_files')!=original_receipt.get('files')):
+                or document(self.ci_sbom/'inventory.json',maximum=32*1024*1024).get('release_files')!=original_receipt.get('files')):
             raise PipelineError('原始 CI 收据、实际发布文件和已证明 SBOM 不属于同一构建，禁止签名。')
         self.event('verified-native-sbom','passed')
         if not self.read_only_dry:
