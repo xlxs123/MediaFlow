@@ -1,6 +1,7 @@
 """Real receipt bytes and exact per-ancestor checks; no large allocation needed."""
 from contextlib import contextmanager
 import hashlib
+import json
 from pathlib import Path
 import stat
 import tempfile
@@ -102,3 +103,34 @@ class PlainPathTests(unittest.TestCase):
         existing = self.root / 'known.bin'; existing.write_bytes(b'fixture')
         self.assertEqual(_plain(existing), existing)
         self.assertEqual(_plain(self.root / 'new' / 'output.zip'), self.root / 'new' / 'output.zip')
+
+
+class SBOMEvidenceBoundTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix='MediaFlow-sbom-evidence-bound-')
+        self.addCleanup(self.temp.cleanup)
+        self.path = Path(self.temp.name) / 'inventory.json'
+
+    def test_large_sbom_index_uses_its_own_bound_without_expanding_manifest_reads(self):
+        from scripts.release_pipeline import document
+        from scripts.publish_release import PublishError
+        value = dict(release_files=[], evidence='x' * (2 * 1024 * 1024))
+        self.path.write_bytes(json.dumps(value).encode('utf-8'))
+        before = hashlib.sha256(self.path.read_bytes()).hexdigest()
+        with self.assertRaises(PublishError):
+            document(self.path)
+        self.assertEqual(document(self.path, maximum=32 * 1024 * 1024), value)
+        self.assertEqual(hashlib.sha256(self.path.read_bytes()).hexdigest(), before)
+
+    def test_sbom_bound_remains_finite_and_strict_json_validation_is_preserved(self):
+        from scripts.release_pipeline import document
+        from scripts.publish_release import PublishError
+        for invalid in (b'{"duplicate":1,"duplicate":2}', b'{"value":NaN}', b'[]'):
+            with self.subTest(kind=invalid):
+                self.path.write_bytes(invalid)
+                with self.assertRaises(PublishError):
+                    document(self.path, maximum=32 * 1024 * 1024)
+        with self.path.open('wb') as stream:
+            stream.truncate(32 * 1024 * 1024 + 1)
+        with self.assertRaises(PublishError):
+            document(self.path, maximum=32 * 1024 * 1024)
