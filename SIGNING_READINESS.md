@@ -24,7 +24,7 @@
 | 独立验签 | 实际 embedded signer、预期 thumbprint、Get-AuthenticodeSignature、SignTool `/pa /all /v /tw` 和 WinVerifyTrust 都必须成功；目录签名不足以替代嵌入签名 |
 | 载荷完整性 | 原 unsigned CI 收据/证明保留，仅允许三份 PE 经审核的 checksum/security directory/certificate append 差异；其余载荷及第三方必须一致 |
 | 最终产物绑定 | 签后独立 SBOM 派生、最终 ZIP 大小和 SHA-256、Ed25519 清单及 ZIP 内三个实际 PE 的验签保持一致 |
-| 发布顺序 | 同提交安全工作流、官方来源证明和正式证书检查通过后，才允许既有 DPAPI 保险库发布路径；普通 CI 没有生产私钥 |
+| 发布顺序 | 同提交安全工作流、官方来源证明和正式证书检查通过后，才允许既有 DPAPI 保险库的正式 Publish 签包操作。配置检查 Check 的解密/核钥先于CI产物证明，不执行签包；本轮只读DryRun两者均跳过。普通 CI 没有生产私钥 |
 
 实现入口仍为 `scripts/authenticode.ps1`、`scripts/authenticode_native.cs`、`scripts/release_security.py` 和现有发布器，没有建立第二套签名系统。
 
