@@ -33,7 +33,8 @@ ROOT_NAMES = frozenset(('main.py', 'build.ps1', 'MediaFlow.spec',
 PUBLIC_SECURITY_FILES = frozenset(('security/dependency-policy.json',
     'security/gitleaks.toml', 'security/sbom-policy.json',
     'security/secret-exceptions.json', 'security/toolchain.json', 'security/codeql-reviews.json',
-    'security/authenticode-policy.json', 'security/native-component-evidence.json'))
+    'security/authenticode-policy.json', 'security/native-component-evidence.json',
+    'security/signpath-policy.json', 'security/signpath-artifact.xml'))
 PROHIBITED_DIRECTORIES = frozenset(('.git', '.venv', 'venv', '__pycache__',
     '.pytest_cache', '.mypy_cache', '.sdk', 'node_modules', 'browserprofile',
     'browserprofiles', 'ebwebview', 'userdata', 'user_data', 'downloads',

@@ -16,6 +16,7 @@ CHECKS = ('CodeQL / Python', 'Resolved Python dependencies',
     'Git history and staged secrets', 'Workflow security policy')
 PROVENANCE_TYPE = 'https://slsa.dev/provenance/v1'
 TRUSTED_PROVENANCE_CONDITION = "${{ github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}"
+TRUSTED_SIGNPATH_CONDITION = "${{ github.event_name == 'workflow_dispatch' && inputs.signpath_request && github.ref == 'refs/heads/main' && github.repository == 'xlxs123/MediaFlow' }}"
 
 
 class SecurityGateError(RuntimeError):
@@ -324,6 +325,9 @@ def workflow_policy(root=ROOT):
                     errors.append(path.name + '/' + key + ': step failure cannot be ignored')
                 if 'uses' not in step:
                     continue
+                if (step['uses'].startswith('signpath/') and
+                        (path.name != 'ci.yml' or key != 'signpath' or step.get('id') != 'submit')):
+                    errors.append(path.name + '/' + key + ': SignPath is restricted to the opt-in protected job')
                 count += 1
                 match = re.fullmatch(r'([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)(?:/[A-Za-z0-9_./-]+)?@([0-9a-f]{40})', step['uses'])
                 if not match or match[1] not in pins or match[2] != pins[match[1]]['commit']:
@@ -343,6 +347,28 @@ def workflow_policy(root=ROOT):
         errors.append('ci.yml: provenance must depend on the verified build and trusted branch condition')
     if any(step.get('run') or step.get('uses', '').startswith('actions/checkout@') for step in provenance.get('steps', [])):
         errors.append('ci.yml: OIDC proof job may use only reviewed artifact/attestation Actions, no checkout or project commands')
+    signing = ci.get('jobs', {}).get('signpath', {})
+    if (signing.get('if') != TRUSTED_SIGNPATH_CONDITION or signing.get('needs') != ['windows', 'provenance']
+            or signing.get('environment') != 'signpath-foundation' or signing.get('runs-on') != 'windows-2022'
+            or signing.get('permissions') != {'contents': 'read', 'actions': 'read'}):
+        errors.append('ci.yml: SignPath must keep the manual main-only protected Environment and verified build/provenance dependencies')
+    steps = signing.get('steps', [])
+    ids = [step.get('id') for step in steps]
+    required = ['preflight', 'prepare', 'unsigned', 'submit', 'verify']
+    if [name for name in ids if name in required] != required:
+        errors.append('ci.yml: SignPath preflight/source/upload/request/native verification order is mandatory')
+    submit = next((step for step in steps if step.get('id') == 'submit'), {})
+    settings = submit.get('with', {})
+    if (settings.get('github-artifact-id') != '${{ steps.unsigned.outputs.artifact-id }}'
+            or settings.get('wait-for-completion') != 'true' or settings.get('skip-decompress') != 'true'
+            or settings.get('api-token') != '${{ secrets.SIGNPATH_API_TOKEN }}'):
+        errors.append('ci.yml: SignPath must use its own uploaded artifact, protected token and raw returned archive')
+    option = ci.get('on', {}).get('workflow_dispatch', {}).get('inputs', {}).get('signpath_request', {})
+    if option.get('type') != 'boolean' or option.get('default') != 'false':
+        errors.append('ci.yml: SignPath signing must be explicitly requested and default off')
+    for name, job in ci.get('jobs', {}).items():
+        if name != 'signpath' and 'secrets.SIGNPATH_API_TOKEN' in json.dumps(job):
+            errors.append('ci.yml: ordinary jobs cannot access the protected SignPath credential')
     return dict(passed=not errors, checked_actions=count, errors=errors,
         pinned_actions=list(pins), policy='Immutable official Actions; scoped writes; no privileged PR execution or bypass.')
 

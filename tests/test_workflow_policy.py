@@ -50,3 +50,37 @@ class WorkflowPolicyTests(unittest.TestCase):
         result = gate.workflow_policy(self.root)
         self.assertFalse(result['passed'])
         self.assertTrue(any('unreviewed write permissions' in error for error in result['errors']))
+
+    def test_signpath_cannot_drop_branch_environment_or_provenance_gates(self):
+        path = self.root / '.github/workflows/ci.yml'
+        original = path.read_text('utf-8')
+        for before, after in ((gate.TRUSTED_SIGNPATH_CONDITION, '${{ true }}'),
+                ('needs: [windows, provenance]', 'needs: [windows]'),
+                ('environment: signpath-foundation', 'environment: uncontrolled'),
+                ('skip-decompress: true', 'skip-decompress: false')):
+            with self.subTest(change=before):
+                self.assertIn(before, original)
+                path.write_text(original.replace(before, after), 'utf-8')
+                self.assertFalse(gate.workflow_policy(self.root)['passed'])
+
+    def test_signpath_secret_cannot_be_exposed_to_normal_ci_job(self):
+        path = self.root / '.github/workflows/ci.yml'
+        original = path.read_text('utf-8')
+        path.write_text(original.replace('PYTHONIOENCODING: utf-8',
+            "LEAK: ${{ secrets.SIGNPATH_API_TOKEN }}\n      PYTHONIOENCODING: utf-8", 1), 'utf-8')
+        result = gate.workflow_policy(self.root)
+        self.assertFalse(result['passed'])
+        self.assertTrue(any('ordinary jobs' in error for error in result['errors']))
+
+    def test_signpath_artifact_template_cannot_sign_upstream_or_unknown_files(self):
+        from xml.etree import ElementTree
+        from scripts.release_security import FIRST_PARTY
+        value = ElementTree.parse(gate.ROOT / 'security/signpath-artifact.xml')
+        ns = {'s': 'http://signpath.io/artifact-configuration/v1'}
+        files = value.findall('./s:zip-file/s:pe-file', ns)
+        self.assertEqual({node.attrib['path'] for node in files}, set(FIRST_PARTY))
+        self.assertEqual(len(files), len(FIRST_PARTY))
+        for node in files:
+            self.assertEqual(node.attrib['product-name'], 'MediaFlow')
+            self.assertEqual(node.attrib['product-version'], '${version}')
+            self.assertEqual([child.tag for child in node], ['{' + ns['s'] + '}authenticode-sign'])

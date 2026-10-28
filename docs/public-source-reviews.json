@@ -1025,19 +1025,19 @@
     },
     {
       "path": "tests/test_public_source_audit.py",
-      "sha256": "cf2cd54b7058fac3c830027f82c3c92775dc276c450b12476bbeb320d62e83a9",
+      "sha256": "64318c6f29987a8881f948cfe718bcf55b7505547fab783f5fb64659a8c5c8b2",
       "classification": "synthetic_test_data",
-      "reviewed_by": "Codex source disclosure review",
-      "reason": "复核完整文件及与基线差异：敏感值均为原有合成扫描夹具；新增测试只允许精确两个公开策略/原生元数据文件，仍拒绝其他未审查 security JSON，不扩大目录豁免。",
+      "reviewed_by": "Codex exact staged-source review; main c3fa7bb comparison",
+      "reason": "复核基线文件摘要及精确暂存差异：原有凭据/密钥生成均是原先合成扫描夹具，内容未变；本轮仅新增两个SignPath公开配置精确路径测试，仍拒绝其他security JSON/XML及私钥文件，没有新增真实秘密或宽泛豁免。",
       "reviewed_lines": [
-        45,
-        56,
-        58,
-        65,
-        87,
-        166,
-        173,
-        203
+        53,
+        64,
+        66,
+        73,
+        95,
+        174,
+        181,
+        211
       ],
       "reviewed_rules": [
         "credential_header_literal",

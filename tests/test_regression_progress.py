@@ -98,7 +98,12 @@ class RegressionProgressTests(unittest.TestCase):
         if os.name != 'nt':
             self.assertIsNone(descendants(os.getpid())); return
         marker = self.root / 'child.pid'
-        program = 'import subprocess,sys,time; p=subprocess.Popen([sys.executable,"-c","import time;time.sleep(60)"]);open(sys.argv[1],"w").write(str(p.pid));time.sleep(60)'
+        # Publish the marker only after the PID is fully written and closed.
+        # An existing but still-empty file is not a ready child process signal.
+        program = ('import pathlib,subprocess,sys,time; '
+            'p=subprocess.Popen([sys.executable,"-c","import time;time.sleep(60)"]); '
+            'marker=pathlib.Path(sys.argv[1]); pending=marker.with_suffix(".pending"); '
+            'pending.write_text(str(p.pid),encoding="ascii"); pending.replace(marker); time.sleep(60)')
         process = subprocess.Popen([sys.executable, '-c', program, str(marker)], creationflags=NO_WINDOW)
         tree = ProcessTree(process)
         try:

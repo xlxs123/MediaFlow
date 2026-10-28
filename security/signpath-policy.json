@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "product": "MediaFlow",
+  "enabled": false,
+  "foundation_approved": false,
+  "license_review_accepted": false,
+  "organization_id": "",
+  "project_slug": "",
+  "signing_policy_slug": "",
+  "artifact_configuration_slug": "",
+  "certificate_thumbprint": "",
+  "certificate_subject": "",
+  "action_commit": "f6d04783b4569d051e0c80105fe66e82819d0092",
+  "environment": "signpath-foundation"
+}

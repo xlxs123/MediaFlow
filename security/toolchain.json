@@ -71,6 +71,21 @@
           "sha256": "9fb3b3ecd703b994c45c0d18c62934ce095c6863b45240fc43a20d2dea58abc6"
         }
       ]
+    },
+    "signpath/github-action-submit-signing-request": {
+      "version": "v3.0",
+      "commit": "f6d04783b4569d051e0c80105fe66e82819d0092",
+      "official_release": "https://github.com/signpath/github-action-submit-signing-request/tree/v3.0",
+      "entrypoints": [
+        {
+          "path": "action.yml",
+          "sha256": "9afe14756752bb0b43421bf94e7cebdc3fead29765be4f07fbc60d82421ebc23"
+        },
+        {
+          "path": "index.js",
+          "sha256": "40af2e2581648d7357de3c13ca081ce87ac97f0aa66fdd2c5e3f1468d3232751"
+        }
+      ]
     }
   },
   "binary_tools": {
