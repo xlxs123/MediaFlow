@@ -17,6 +17,9 @@ CHECKS = ('CodeQL / Python', 'Resolved Python dependencies',
 PROVENANCE_TYPE = 'https://slsa.dev/provenance/v1'
 TRUSTED_PROVENANCE_CONDITION = "${{ github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}"
 TRUSTED_SIGNPATH_CONDITION = "${{ github.event_name == 'workflow_dispatch' && inputs.signpath_request && github.ref == 'refs/heads/main' && github.repository == 'xlxs123/MediaFlow' }}"
+_SIGNPATH_PREDICATE = TRUSTED_SIGNPATH_CONDITION[4:-3]
+SIGNPATH_CONCURRENCY_GROUP = "${{ (" + _SIGNPATH_PREDICATE + ") && 'mediaflow-signpath-main' || format('mediaflow-ci-{0}-{1}', github.workflow, github.ref) }}"
+SIGNPATH_CANCEL_CONDITION = "${{ !(" + _SIGNPATH_PREDICATE + ") }}"
 
 
 class SecurityGateError(RuntimeError):
@@ -305,11 +308,15 @@ def workflow_policy(root=ROOT):
     workflow_directory = root / '.github/workflows'
     for path in sorted([*workflow_directory.glob('*.yml'), *workflow_directory.glob('*.yaml')]):
         value = yaml.load(path.read_text('utf-8'), Loader=yaml.BaseLoader)
+        if path.name != 'ci.yml' and 'mediaflow-signpath-main' in str(value.get('concurrency', '')).casefold():
+            errors.append(path.name + ': the signing concurrency group is reserved for the opt-in CI run')
         if value.get('permissions') != {'contents': 'read'}:
             errors.append(path.name + ': workflow permissions must be contents:read only')
         if 'pull_request_target' in value.get('on', {}):
             errors.append(path.name + ': privileged untrusted-code trigger is forbidden')
         for key, job in value.get('jobs', {}).items():
+            if path.name != 'ci.yml' and 'mediaflow-signpath-main' in str(job.get('concurrency', '')).casefold():
+                errors.append(path.name + '/' + key + ': the signing concurrency group cannot be reused by another job')
             if job.get('uses'):
                 errors.append(path.name + '/' + key + ': reusable workflow is not in the reviewed Action policy')
             permissions = job.get('permissions', {})
@@ -333,6 +340,8 @@ def workflow_policy(root=ROOT):
                 if not match or match[1] not in pins or match[2] != pins[match[1]]['commit']:
                     errors.append(path.name + '/' + key + ': Action is not the reviewed official immutable commit')
     security = yaml.load((root / '.github/workflows/security.yml').read_text('utf-8'), Loader=yaml.BaseLoader)
+    if security.get('concurrency') != {'group': 'mediaflow-security-${{ github.ref }}', 'cancel-in-progress': 'true'}:
+        errors.append('security.yml: ordinary security CI must retain its independent cancelling concurrency group')
     triggers = security.get('on', {})
     if not all(name in triggers for name in ('push', 'pull_request', 'schedule', 'workflow_dispatch')):
         errors.append('security.yml: required continuous security triggers are missing')
@@ -342,6 +351,11 @@ def workflow_policy(root=ROOT):
     if not set(CHECKS).issubset(names):
         errors.append('security.yml: required blocking security jobs are missing')
     ci = yaml.load((root / '.github/workflows/ci.yml').read_text('utf-8'), Loader=yaml.BaseLoader)
+    if ci.get('concurrency') != {'group': SIGNPATH_CONCURRENCY_GROUP,
+            'cancel-in-progress': SIGNPATH_CANCEL_CONDITION}:
+        errors.append('ci.yml: signing must use an isolated non-cancelling group while ordinary CI keeps cancellation')
+    if any('concurrency' in job for job in ci.get('jobs', {}).values()):
+        errors.append('ci.yml: unreviewed job concurrency can collide with the protected workflow signing group')
     provenance = ci.get('jobs', {}).get('provenance', {})
     if provenance.get('needs') != 'windows' or provenance.get('if') != TRUSTED_PROVENANCE_CONDITION:
         errors.append('ci.yml: provenance must depend on the verified build and trusted branch condition')

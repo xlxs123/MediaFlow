@@ -51,6 +51,18 @@
 
 后续实际发布必须在现有安全发布环境中执行独立包生成、受保护 Ed25519 清单签名、最终 ZIP 重新提取并 Production Verify、`publication_sbom` 派生/独立验证及正式发布门禁。现有 `release_mediaflow.ps1` 的本地 Sign 阶段尚未增加跳转云签名输出的自动选择参数；不得拿此 PR 声称已经完成云签名到正式发布的真实端到端集成。首次获批后应先隔离验收，再审阅该衔接，不通过再签名覆盖云签名来凑通流程。
 
+## 并发隔离修正（以 PR #13 的 67f8ba8 为基线）
+
+原工作流所有运行共用 `mediaflow-ci-{workflow}-{ref}` 并统一设置 `cancel-in-progress: true`。因此 main 上普通 push 或常规手动 CI 可能取消同一 main 上等待审批/服务的签名工作流；只修改子 Job 的并发选项不能保护父工作流。
+
+现在在**工作流级别**使用与 SignPath Job `if` 相同的四条件分类：真实仓库、main、workflow_dispatch、显式布尔 signpath_request。普通 CI 保留原分组及自动取消；授权签名使用固定 `mediaflow-signpath-main`，取消条件为 false。签名组不包含 run_id 或 commit，后续签名运行也不能取消正在进行的同组运行。原 Job 条件、构建/来源证明依赖、Environment、Token 隔离及默认 false 均未改变；分组不是授权替代，请求仍经过原预检。
+
+[GitHub 当前官方并发文档](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#concurrency) 明确默认 single 队列只有一个运行中和一个待运行位置；新到的签名 C 会替换待运行的 B，仍不取消运行中的 A。因此本方案**不提供保留所有意图的队列，也不承诺按触发顺序 FIFO**。官网另提供最多100待运行的 `queue: max`，但不能与 `cancel-in-progress: true` 组合。本次保留兼容的默认 single，不为此拆分已验证的 CI 或引入未经验证的动态 queue 配置。
+
+操作要求：一次只提交一个签名意图，确认前一运行和远端请求已结束再发起下一次。待运行被替换的工作流尚未执行其 Job，可在核对后手动重新提交。**已提交远端请求的运行**如果被人工取消、超时、runner/网络故障终止，远端请求仍可能等待审批或已完成；必须先按 request ID、源提交及产物在 SignPath 核对状态，再决定重试，不能将 GitHub 取消等同于远端取消或自动重复申请。
+
+策略门禁锁定上述工作流分组与取消表达式，拒绝 CI Job 级并发覆盖及其他工作流/Job对保留组名的字面占用（含大小写变体），并锁定现有 security 工作流的独立分组。任意新增动态拼组仍需人工审阅；这里不是通用 GitHub 表达式安全分析器。回归测试从实际 YAML 求值规范上下文的授权矩阵，并建立默认单待运行位置的本地状态模型；这不是在真实签名服务执行并发验收。GitHub 表达式的字符串比较忽略大小写，最终严格上下文检查仍由既有请求预检承担，不通过本次分组修改扩大权限。正式签名开关与凭据仍未配置，不因测试触发真实服务。
+
 ## 本轮验证记录
 
 本节最终按实际命令和 CI artifact 更新。不能把未启用的 Job、模拟 ZIP 或历史 CI 记为真实 SignPath 签名成功。

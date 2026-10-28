@@ -16,8 +16,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: mediaflow-ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Keep signing waits isolated from ordinary CI. Default pending capacity is
+  # still one: a third signing dispatch may replace the pending (not active) run.
+  group: ${{ (github.event_name == 'workflow_dispatch' && inputs.signpath_request && github.ref == 'refs/heads/main' && github.repository == 'xlxs123/MediaFlow') && 'mediaflow-signpath-main' || format('mediaflow-ci-{0}-{1}', github.workflow, github.ref) }}
+  cancel-in-progress: ${{ !(github.event_name == 'workflow_dispatch' && inputs.signpath_request && github.ref == 'refs/heads/main' && github.repository == 'xlxs123/MediaFlow') }}
 
 jobs:
   windows:
