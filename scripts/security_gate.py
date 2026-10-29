@@ -20,6 +20,7 @@ TRUSTED_SIGNPATH_CONDITION = "${{ github.event_name == 'workflow_dispatch' && in
 _SIGNPATH_PREDICATE = TRUSTED_SIGNPATH_CONDITION[4:-3]
 SIGNPATH_CONCURRENCY_GROUP = "${{ (" + _SIGNPATH_PREDICATE + ") && 'mediaflow-signpath-main' || format('mediaflow-ci-{0}-{1}', github.workflow, github.ref) }}"
 SIGNPATH_CANCEL_CONDITION = "${{ !(" + _SIGNPATH_PREDICATE + ") }}"
+SIGNPATH_ACTION = 'signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092'
 
 
 class SecurityGateError(RuntimeError):
@@ -299,15 +300,175 @@ def scan_sarif(directory, *, root=ROOT, reviews_path=None):
         findings=findings, reviewed_findings=reviewed)
 
 
+def _workflow_expressions(value, *, implicit=False):
+    """Find expression boundaries without treating a quoted '}}' as the end."""
+    expressions = []
+    start = 0
+    while (opening := value.find('${{', start)) != -1:
+        cursor = opening + 3
+        quoted = False
+        while cursor < len(value):
+            if value[cursor] == "'":
+                if quoted and value[cursor:cursor + 2] == "''":
+                    cursor += 2
+                    continue
+                quoted = not quoted
+            elif not quoted and value[cursor:cursor + 2] == '}}':
+                expressions.append((opening, cursor + 2, value[opening + 3:cursor]))
+                start = cursor + 2
+                break
+            cursor += 1
+        else:
+            raise SecurityGateError('Unclosed workflow expression; credential scope cannot be verified.')
+    if implicit and not expressions:
+        expressions.append((0, len(value), value))
+    return expressions
+
+
+def _expression_tokens(source):
+    # This is deliberately a lexer, not an evaluator for GitHub expressions.
+    # Only the two complete, narrowly specified expressions below are allowed.
+    return re.findall(r"'(?:[^']|'')*'|[A-Za-z_][A-Za-z_0-9-]*|!=|\S", source)
+
+
+def _secret_access(tokens, index):
+    """Return a fixed secret name/end offset, or None for opaque context access."""
+    if tokens[index].casefold() != 'secrets' or (index and tokens[index - 1] == '.'):
+        return None
+    if (tokens[index + 1:index + 2] == ['.'] and index + 2 < len(tokens)
+            and re.fullmatch(r'[A-Za-z_][A-Za-z_0-9-]*', tokens[index + 2])):
+        return tokens[index + 2], index + 3
+    if (tokens[index + 1:index + 2] == ['['] and index + 3 < len(tokens)
+            and tokens[index + 2].startswith("'") and tokens[index + 3] == ']'):
+        return tokens[index + 2][1:-1].replace("''", "'"), index + 4
+    return '', index + 1  # Dynamic indexing, wildcards and bare secrets fail closed.
+
+
+def _signpath_expression_kind(value):
+    """Accept only a whole scalar Secret lookup, or that lookup != empty string."""
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    try:
+        expressions = _workflow_expressions(value)
+    except SecurityGateError:
+        return None
+    if len(expressions) != 1 or expressions[0][:2] != (0, len(value)):
+        return None
+    tokens = _expression_tokens(expressions[0][2])
+    access = _secret_access(tokens, 0) if tokens else None
+    if access and access[0].casefold() == 'signpath_api_token':
+        remaining = tokens[access[1]:]
+        if not remaining:
+            return 'value'
+        if remaining == ['!=', "''"]:
+            return 'presence'
+    return None
+
+
+def _workflow_credential_policy(workflow, value):
+    """Check every parsed YAML field, including nested values and mapping keys.
+
+    Fixed dot/literal-index lookups are understood; dynamic or whole-context
+    secrets access is rejected because it may disclose the protected token.
+    This policy does not claim to implement all GitHub expression semantics.
+    """
+    errors = []
+    signing = value.get('jobs', {}).get('signpath', {}) if workflow == 'ci.yml' else {}
+    steps = signing.get('steps', [])
+    submits = [index for index, step in enumerate(steps) if step.get('id') == 'submit']
+    sink = ('jobs', 'signpath', 'steps', submits[0], 'with', 'api-token') if len(submits) == 1 else None
+    reviewed = sink is not None and steps[submits[0]].get('uses') == SIGNPATH_ACTION
+    presence = ('jobs', 'signpath', 'env', 'SIGNPATH_TOKEN_PRESENT')
+
+    def location(path):
+        parts = []
+        for index, part in enumerate(path):
+            label = str(part)
+            if index >= 3 and path[index - 1] == 'steps' and isinstance(part, int):
+                job = value.get('jobs', {}).get(path[index - 2], {})
+                step_id = job.get('steps', [])[part].get('id')
+                if step_id:
+                    label += '(id=' + str(step_id) + ')'
+            parts.append(label)
+        return workflow + '/' + '/'.join(parts)
+
+    def visit(node, path=(), ancestors=()):
+        if isinstance(node, (dict, list)):
+            if id(node) in ancestors:
+                errors.append(location(path) + ': recursive YAML cannot be checked for credential access')
+                return
+            ancestors = (*ancestors, id(node))
+            for key, child in (node.items() if isinstance(node, dict) else enumerate(node)):
+                if isinstance(node, dict):
+                    visit(key, (*path, '<mapping-key>'), ancestors)
+                visit(child, (*path, key), ancestors)
+        elif isinstance(node, str):
+            try:
+                expressions = _workflow_expressions(node, implicit=bool(path and path[-1] == 'if'))
+                accesses = [access for _, _, source in expressions
+                    for tokens in [_expression_tokens(source)] for index in range(len(tokens))
+                    if (access := _secret_access(tokens, index)) is not None
+                    and (not access[0] or access[0].casefold() == 'signpath_api_token')]
+                allowed = (workflow == 'ci.yml' and (
+                    path == presence and _signpath_expression_kind(node) == 'presence' or
+                    reviewed and path == sink and _signpath_expression_kind(node) == 'value'))
+                if accesses and not allowed:
+                    ordinary = len(path) >= 2 and path[0] == 'jobs' and path[1] != 'signpath'
+                    errors.append(location(path) + ': ' + ('ordinary jobs cannot access the protected SignPath credential'
+                        if ordinary else 'unreviewed SignPath credential reference or opaque secrets access'))
+            except SecurityGateError:
+                errors.append(location(path) + ': malformed expression; credential access cannot be verified')
+
+    visit(value)
+    if workflow == 'ci.yml':
+        for path, scalar, kind, context in (
+                (presence, signing.get('env', {}).get('SIGNPATH_TOKEN_PRESENT'), 'presence', True),
+                (sink or ('jobs', 'signpath', 'steps', '<unique-submit>', 'with', 'api-token'),
+                 steps[submits[0]].get('with', {}).get('api-token') if sink else None, 'value', reviewed)):
+            try:
+                valid = context and _signpath_expression_kind(scalar) == kind
+            except SecurityGateError:
+                valid = False
+            if not valid:
+                errors.append(location(path) + ': required credential ' + kind + ' expression or reviewed Action context is invalid')
+    return errors
+
+
 def workflow_policy(root=ROOT):
     import yaml  # Isolated, pinned security tool; no application runtime dependency.
+
+    class PolicyLoader(yaml.BaseLoader):
+        def construct_mapping(self, node, deep=False):
+            result = {}
+            for key_node, child in node.value:
+                key = self.construct_object(key_node, deep=deep)
+                if not isinstance(key, str) or key in result:
+                    raise SecurityGateError('ambiguous YAML mapping at line ' + str(key_node.start_mark.line + 1)
+                        + '; credential references cannot be verified')
+                result[key] = self.construct_object(child, deep=deep)
+            return result
+
     root = Path(root)
     pins = json.loads((root / 'security/toolchain.json').read_text('utf-8'))['actions']
     errors = []
     count = 0
+    workflows = {}
     workflow_directory = root / '.github/workflows'
     for path in sorted([*workflow_directory.glob('*.yml'), *workflow_directory.glob('*.yaml')]):
-        value = yaml.load(path.read_text('utf-8'), Loader=yaml.BaseLoader)
+        try:
+            value = yaml.load(path.read_text('utf-8'), Loader=PolicyLoader)
+        except SecurityGateError as error:
+            errors.append(path.name + ': ' + str(error))
+            continue
+        except yaml.YAMLError:
+            errors.append(path.name + ': invalid YAML; credential references cannot be verified')
+            continue
+        if not isinstance(value, dict):
+            errors.append(path.name + ': expected a workflow mapping; credential references cannot be verified')
+            continue
+        workflows[path.name] = value
+        errors.extend(_workflow_credential_policy(path.name, value))
         if path.name != 'ci.yml' and 'mediaflow-signpath-main' in str(value.get('concurrency', '')).casefold():
             errors.append(path.name + ': the signing concurrency group is reserved for the opt-in CI run')
         if value.get('permissions') != {'contents': 'read'}:
@@ -339,7 +500,7 @@ def workflow_policy(root=ROOT):
                 match = re.fullmatch(r'([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)(?:/[A-Za-z0-9_./-]+)?@([0-9a-f]{40})', step['uses'])
                 if not match or match[1] not in pins or match[2] != pins[match[1]]['commit']:
                     errors.append(path.name + '/' + key + ': Action is not the reviewed official immutable commit')
-    security = yaml.load((root / '.github/workflows/security.yml').read_text('utf-8'), Loader=yaml.BaseLoader)
+    security = workflows.get('security.yml', {})
     if security.get('concurrency') != {'group': 'mediaflow-security-${{ github.ref }}', 'cancel-in-progress': 'true'}:
         errors.append('security.yml: ordinary security CI must retain its independent cancelling concurrency group')
     triggers = security.get('on', {})
@@ -350,7 +511,7 @@ def workflow_policy(root=ROOT):
         errors.append('security.yml: CodeQL PR scans must disable diff-informed result filtering')
     if not set(CHECKS).issubset(names):
         errors.append('security.yml: required blocking security jobs are missing')
-    ci = yaml.load((root / '.github/workflows/ci.yml').read_text('utf-8'), Loader=yaml.BaseLoader)
+    ci = workflows.get('ci.yml', {})
     if ci.get('concurrency') != {'group': SIGNPATH_CONCURRENCY_GROUP,
             'cancel-in-progress': SIGNPATH_CANCEL_CONDITION}:
         errors.append('ci.yml: signing must use an isolated non-cancelling group while ordinary CI keeps cancellation')
@@ -375,14 +536,11 @@ def workflow_policy(root=ROOT):
     settings = submit.get('with', {})
     if (settings.get('github-artifact-id') != '${{ steps.unsigned.outputs.artifact-id }}'
             or settings.get('wait-for-completion') != 'true' or settings.get('skip-decompress') != 'true'
-            or settings.get('api-token') != '${{ secrets.SIGNPATH_API_TOKEN }}'):
+            or _signpath_expression_kind(settings.get('api-token')) != 'value'):
         errors.append('ci.yml: SignPath must use its own uploaded artifact, protected token and raw returned archive')
     option = ci.get('on', {}).get('workflow_dispatch', {}).get('inputs', {}).get('signpath_request', {})
     if option.get('type') != 'boolean' or option.get('default') != 'false':
         errors.append('ci.yml: SignPath signing must be explicitly requested and default off')
-    for name, job in ci.get('jobs', {}).items():
-        if name != 'signpath' and 'secrets.SIGNPATH_API_TOKEN' in json.dumps(job):
-            errors.append('ci.yml: ordinary jobs cannot access the protected SignPath credential')
     return dict(passed=not errors, checked_actions=count, errors=errors,
         pinned_actions=list(pins), policy='Immutable official Actions; scoped writes; no privileged PR execution or bypass.')
 

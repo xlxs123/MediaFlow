@@ -92,6 +92,16 @@ class WorkflowPolicyTests(unittest.TestCase):
         import yaml
         return yaml.load((self.root / '.github/workflows/ci.yml').read_text('utf-8'), Loader=yaml.BaseLoader)
 
+    def write_workflow(self, value):
+        import yaml
+        (self.root / '.github/workflows/ci.yml').write_text(yaml.safe_dump(value, sort_keys=False), 'utf-8')
+
+    def credential_denied(self, value, location):
+        self.write_workflow(value)
+        result = gate.workflow_policy(self.root)
+        self.assertFalse(result['passed'])
+        self.assertTrue(any(location in error and 'credential' in error for error in result['errors']), result['errors'])
+
     def context(self, event='workflow_dispatch', request=True, repository='xlxs123/MediaFlow', ref='refs/heads/main', **extra):
         return {'github': dict(event_name=event, repository=repository, ref=ref,
                               workflow=self.workflow()['name'], **extra),
@@ -159,6 +169,197 @@ class WorkflowPolicyTests(unittest.TestCase):
         result = gate.workflow_policy(self.root)
         self.assertFalse(result['passed'])
         self.assertTrue(any('ordinary jobs' in error for error in result['errors']))
+
+    def test_only_designated_boolean_presence_check_is_allowed(self):
+        value = self.workflow()
+        self.assertEqual(value['jobs']['signpath']['env']['SIGNPATH_TOKEN_PRESENT'],
+                         "${{ secrets.SIGNPATH_API_TOKEN != '' }}")
+        self.assertTrue(gate.workflow_policy(self.root)['passed'])
+        value['jobs']['signpath']['env']['EXTRA_PRESENT'] = "${{ secrets.SIGNPATH_API_TOKEN != '' }}"
+        self.credential_denied(value, '/jobs/signpath/env/EXTRA_PRESENT')
+
+    def test_workflow_level_credential_reference_is_rejected(self):
+        value = self.workflow()
+        value['env'] = {'LEAK': '${{ secrets.SIGNPATH_API_TOKEN }}'}
+        self.credential_denied(value, 'ci.yml/env/LEAK')
+
+    def test_signing_job_level_credential_reference_is_rejected(self):
+        value = self.workflow()
+        value['jobs']['signpath']['env']['LEAK'] = '${{ secrets.SIGNPATH_API_TOKEN }}'
+        self.credential_denied(value, '/jobs/signpath/env/LEAK')
+
+    def test_step_fields_and_other_actions_cannot_receive_credential(self):
+        original = self.workflow()
+        for step_id, field in product(('preflight', 'prepare', 'submit', 'verify'), ('env', 'with', 'run')):
+            with self.subTest(step=step_id, field=field):
+                from copy import deepcopy
+                value = deepcopy(original)
+                step = next(item for item in value['jobs']['signpath']['steps'] if item.get('id') == step_id)
+                if field == 'run':
+                    step[field] = 'echo ${{ secrets.SIGNPATH_API_TOKEN }}'
+                else:
+                    step.setdefault(field, {})['LEAK'] = '${{ secrets.SIGNPATH_API_TOKEN }}'
+                self.credential_denied(value, '/' + field)
+        value = original
+        step = value['jobs']['signpath']['steps'][0]
+        self.assertTrue(step['uses'].startswith('actions/checkout@'))
+        step['with']['LEAK'] = '${{ secrets.SIGNPATH_API_TOKEN }}'
+        self.credential_denied(value, '/with/LEAK')
+
+    def test_wrong_missing_or_computed_api_token_is_rejected(self):
+        from copy import deepcopy
+        original = self.workflow()
+        for expression in (None, '${{ secrets.OTHER_TOKEN }}',
+                "${{ format('{0}', secrets.SIGNPATH_API_TOKEN) }}",
+                "prefix-${{ secrets.SIGNPATH_API_TOKEN }}",
+                '${{ secrets.SIGNPATH_API_TOKEN',
+                '${{ secrets.SIGNPATH_API_TOKEN }}${{ secrets.SIGNPATH_API_TOKEN }}'):
+            with self.subTest(expression=expression):
+                value = deepcopy(original)
+                settings = next(step['with'] for step in value['jobs']['signpath']['steps'] if step.get('id') == 'submit')
+                settings.pop('api-token')
+                if expression is not None:
+                    settings['api-token'] = expression
+                self.credential_denied(value, '/with/api-token')
+
+    def test_boolean_check_cannot_return_or_interpolate_the_actual_value(self):
+        from copy import deepcopy
+        original = self.workflow()
+        for expression in (None, '${{ secrets.SIGNPATH_API_TOKEN }}',
+                "${{ secrets.SIGNPATH_API_TOKEN != '' && secrets.SIGNPATH_API_TOKEN }}",
+                "${{ secrets.SIGNPATH_API_TOKEN != '' }}-${{ secrets.SIGNPATH_API_TOKEN }}"):
+            with self.subTest(expression=expression):
+                value = deepcopy(original)
+                value['jobs']['signpath']['env'].pop('SIGNPATH_TOKEN_PRESENT')
+                if expression is not None:
+                    value['jobs']['signpath']['env']['SIGNPATH_TOKEN_PRESENT'] = expression
+                self.credential_denied(value, '/env/SIGNPATH_TOKEN_PRESENT')
+
+    def test_literal_index_access_is_classified_at_both_approved_positions(self):
+        value = self.workflow()
+        value['jobs']['signpath']['env']['SIGNPATH_TOKEN_PRESENT'] = "${{ secrets['SIGNPATH_API_TOKEN'] != '' }}"
+        submit = next(step for step in value['jobs']['signpath']['steps'] if step.get('id') == 'submit')
+        submit['with']['api-token'] = "${{ secrets [ 'SIGNPATH_API_TOKEN' ] }}"
+        self.write_workflow(value)
+        self.assertTrue(gate.workflow_policy(self.root)['passed'])
+        value['env'] = {'LEAK': "${{ secrets['SIGNPATH_API_TOKEN'] }}"}
+        self.credential_denied(value, 'ci.yml/env/LEAK')
+
+    def test_opaque_secret_access_fails_closed(self):
+        original = self.workflow()
+        for expression in ("${{ secrets[env.NAME] }}", "${{ toJSON(secrets) }}",
+                "${{ secrets[format('{0}_{1}', 'SIGNPATH', 'API_TOKEN')] }}",
+                '${{ secrets.* }}', '${{ SECRETS.signpath_api_token }}',
+                '${{ secrets["SIGNPATH_API_TOKEN"] }}'):
+            with self.subTest(expression=expression):
+                value = dict(original, env={'LEAK': expression})
+                self.credential_denied(value, 'ci.yml/env/LEAK')
+
+    def test_recursive_fields_and_implicit_if_are_checked(self):
+        from copy import deepcopy
+        original = self.workflow()
+        for where in ('run-name', 'defaults', 'strategy', 'container', 'if', 'expression-key'):
+            with self.subTest(where=where):
+                value = deepcopy(original)
+                windows = value['jobs']['windows']
+                expression = "${{ secrets['SIGNPATH_API_TOKEN'] }}"
+                if where == 'run-name':
+                    value[where] = expression
+                elif where == 'defaults':
+                    value[where] = {'run': {'working-directory': expression}}
+                elif where == 'strategy':
+                    windows[where] = {'matrix': {'include': [{'nested': [expression]}]}}
+                elif where == 'container':
+                    windows[where] = {'credentials': {'password': expression}}
+                elif where == 'if':
+                    windows['steps'][0]['if'] = "secrets['SIGNPATH_API_TOKEN'] != ''"
+                else:
+                    value['env'] = {expression: 'harmless'}
+                self.credential_denied(value, 'ci.yml/')
+
+    def test_other_workflows_cannot_use_the_signing_credential(self):
+        self.extra('another.yaml', '  ordinary:\n    runs-on: ubuntu-24.04\n'
+            "    env:\n      LEAK: ${{ secrets['SIGNPATH_API_TOKEN'] }}\n"
+            '    steps:\n      - run: echo unit\n')
+        result = gate.workflow_policy(self.root)
+        self.assertFalse(result['passed'])
+        self.assertTrue(any('another.yaml/jobs/ordinary/env/LEAK' in error for error in result['errors']))
+
+    def test_submit_step_must_use_the_reviewed_signpath_action(self):
+        value = self.workflow()
+        submit = next(step for step in value['jobs']['signpath']['steps'] if step.get('id') == 'submit')
+        submit['uses'] = value['jobs']['signpath']['steps'][0]['uses']
+        self.credential_denied(value, '/with/api-token')
+
+    def test_mutating_both_action_and_pin_cannot_reauthorize_the_credential(self):
+        import json
+        value = self.workflow()
+        submit = next(step for step in value['jobs']['signpath']['steps'] if step.get('id') == 'submit')
+        action, _ = submit['uses'].split('@')
+        submit['uses'] = action + '@' + 'a' * 40
+        path = self.root / 'security/toolchain.json'
+        pins = json.loads(path.read_text('utf-8'))
+        pins['actions'][action]['commit'] = 'a' * 40
+        path.write_text(json.dumps(pins), 'utf-8')
+        self.credential_denied(value, '/with/api-token')
+
+    def test_duplicate_submit_or_signpath_action_is_rejected(self):
+        from copy import deepcopy
+        original = self.workflow()
+        for duplicate_id in ('submit', 'second-submit'):
+            with self.subTest(id=duplicate_id):
+                value = deepcopy(original)
+                duplicate = deepcopy(next(step for step in value['jobs']['signpath']['steps'] if step.get('id') == 'submit'))
+                duplicate['id'] = duplicate_id
+                value['jobs']['signpath']['steps'].append(duplicate)
+                self.credential_denied(value, '/with/api-token')
+
+    def test_harmless_values_and_expression_literals_do_not_expand_secret_access(self):
+        value = self.workflow()
+        value['env'] = {'ORDINARY': 'utf-8', 'PUBLIC_VALUE': '${{ github.repository }}',
+            'OTHER_CREDENTIAL': '${{ secrets.OTHER_TOKEN }}',
+            'PLAIN_TEXT': 'secrets.SIGNPATH_API_TOKEN', 'PROPERTY': '${{ inputs.secrets }}',
+            'LITERAL': "${{ 'secrets.SIGNPATH_API_TOKEN' }}",
+            'ESCAPED_LITERAL': "${{ 'a''secrets.SIGNPATH_API_TOKEN' }}",
+            'DELIMITER_LITERAL': "${{ format('}} {0}', 'secrets.SIGNPATH_API_TOKEN') }}"}
+        self.write_workflow(value)
+        self.assertTrue(gate.workflow_policy(self.root)['passed'])
+
+    def test_embedded_delimiters_cannot_hide_a_later_credential_reference(self):
+        value = self.workflow()
+        value['env'] = {'LEAK': "${{ format('}} {0}', secrets['SIGNPATH_API_TOKEN']) }}"}
+        self.credential_denied(value, 'ci.yml/env/LEAK')
+
+    def test_unclosed_expression_is_rejected_without_echoing_its_contents(self):
+        value = self.workflow()
+        value['env'] = {'LEAK': '${{ secrets.SIGNPATH_API_TOKEN unit-marker-not-a-token'}
+        self.write_workflow(value)
+        result = gate.workflow_policy(self.root)
+        self.assertFalse(result['passed'])
+        self.assertTrue(any('ci.yml/env/LEAK' in error for error in result['errors']))
+        self.assertNotIn('unit-marker-not-a-token', str(result))
+
+    def test_yaml_aliases_do_not_hide_additional_reference_locations(self):
+        value = self.workflow()
+        value['env'] = next(step['with'] for step in value['jobs']['signpath']['steps'] if step.get('id') == 'submit')
+        self.credential_denied(value, 'ci.yml/env/api-token')
+
+    def test_duplicate_yaml_keys_are_rejected_instead_of_discarding_a_reference(self):
+        path = self.root / '.github/workflows/ci.yml'
+        path.write_text(path.read_text('utf-8').replace('PYTHONIOENCODING: utf-8',
+            'LEAK: ${{ secrets.SIGNPATH_API_TOKEN }}\n      LEAK: harmless\n      PYTHONIOENCODING: utf-8', 1), 'utf-8')
+        result = gate.workflow_policy(self.root)
+        self.assertFalse(result['passed'])
+        self.assertTrue(any('ci.yml: ambiguous YAML mapping at line' in error for error in result['errors']))
+
+    def test_recursive_yaml_is_rejected_without_infinite_traversal(self):
+        value = self.workflow()
+        value['env'] = recursive = {}
+        recursive['loop'] = recursive
+        self.write_workflow(value)
+        result = gate.workflow_policy(self.root)
+        self.assertFalse(result['passed'])
+        self.assertTrue(any('ci.yml:' in error and 'credential' in error for error in result['errors']))
 
     def test_signpath_artifact_template_cannot_sign_upstream_or_unknown_files(self):
         from xml.etree import ElementTree
