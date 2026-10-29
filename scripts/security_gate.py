@@ -385,7 +385,7 @@ def _workflow_credential_policy(workflow, value):
         parts = []
         for index, part in enumerate(path):
             label = str(part)
-            if index >= 3 and path[index - 1] == 'steps' and isinstance(part, int):
+            if index == 3 and path[0] == 'jobs' and path[2] == 'steps' and isinstance(part, int):
                 job = value.get('jobs', {}).get(path[index - 2], {})
                 step_id = job.get('steps', [])[part].get('id')
                 if step_id:

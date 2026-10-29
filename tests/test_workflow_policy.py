@@ -258,7 +258,7 @@ class WorkflowPolicyTests(unittest.TestCase):
     def test_recursive_fields_and_implicit_if_are_checked(self):
         from copy import deepcopy
         original = self.workflow()
-        for where in ('run-name', 'defaults', 'strategy', 'container', 'if', 'expression-key'):
+        for where in ('run-name', 'defaults', 'strategy', 'matrix-steps', 'container', 'if', 'expression-key'):
             with self.subTest(where=where):
                 value = deepcopy(original)
                 windows = value['jobs']['windows']
@@ -269,13 +269,16 @@ class WorkflowPolicyTests(unittest.TestCase):
                     value[where] = {'run': {'working-directory': expression}}
                 elif where == 'strategy':
                     windows[where] = {'matrix': {'include': [{'nested': [expression]}]}}
+                elif where == 'matrix-steps':
+                    windows['strategy'] = {'matrix': {'steps': [expression]}}
                 elif where == 'container':
                     windows[where] = {'credentials': {'password': expression}}
                 elif where == 'if':
                     windows['steps'][0]['if'] = "secrets['SIGNPATH_API_TOKEN'] != ''"
                 else:
                     value['env'] = {expression: 'harmless'}
-                self.credential_denied(value, 'ci.yml/')
+                location = 'ci.yml/jobs/windows/strategy/matrix/steps/0' if where == 'matrix-steps' else 'ci.yml/'
+                self.credential_denied(value, location)
 
     def test_other_workflows_cannot_use_the_signing_credential(self):
         self.extra('another.yaml', '  ordinary:\n    runs-on: ubuntu-24.04\n'
