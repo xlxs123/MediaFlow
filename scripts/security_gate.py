@@ -357,7 +357,8 @@ def _signpath_expression_kind(value):
         return None
     tokens = _expression_tokens(expressions[0][2])
     access = _secret_access(tokens, 0) if tokens else None
-    if access and access[0].casefold() == 'signpath_api_token':
+    # Full Unicode folding can equate different lookup keys to the reviewed ASCII name.
+    if access and access[0].isascii() and access[0].casefold() == 'signpath_api_token':
         remaining = tokens[access[1]:]
         if not remaining:
             return 'value'

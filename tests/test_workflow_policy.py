@@ -245,6 +245,28 @@ class WorkflowPolicyTests(unittest.TestCase):
         value['env'] = {'LEAK': "${{ secrets['SIGNPATH_API_TOKEN'] }}"}
         self.credential_denied(value, 'ci.yml/env/LEAK')
 
+    def test_unicode_casefold_aliases_cannot_replace_the_reviewed_secret_name(self):
+        from copy import deepcopy
+        original = self.workflow()
+        for name, use in product(('\u017fIGNPATH_API_TOKEN', 'SIGNPATH_API_TO\u212aEN'), ('presence', 'value')):
+            with self.subTest(name=name, use=use):
+                value = deepcopy(original)
+                expression = "${{ secrets['" + name + "']" + (" != ''" if use == 'presence' else '') + ' }}'
+                if use == 'presence':
+                    value['jobs']['signpath']['env']['SIGNPATH_TOKEN_PRESENT'] = expression
+                    location = '/env/SIGNPATH_TOKEN_PRESENT'
+                else:
+                    submit = next(step for step in value['jobs']['signpath']['steps'] if step.get('id') == 'submit')
+                    submit['with']['api-token'] = expression
+                    location = '/with/api-token'
+                self.credential_denied(value, location)
+        value = deepcopy(original)
+        value['jobs']['signpath']['env']['SIGNPATH_TOKEN_PRESENT'] = "${{ SECRETS['signpath_api_token'] != '' }}"
+        submit = next(step for step in value['jobs']['signpath']['steps'] if step.get('id') == 'submit')
+        submit['with']['api-token'] = '${{ SECRETS.signpath_api_token }}'
+        self.write_workflow(value)
+        self.assertTrue(gate.workflow_policy(self.root)['passed'])
+
     def test_opaque_secret_access_fails_closed(self):
         original = self.workflow()
         for expression in ("${{ secrets[env.NAME] }}", "${{ toJSON(secrets) }}",
