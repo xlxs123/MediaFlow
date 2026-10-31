@@ -472,6 +472,10 @@ def workflow_policy(root=ROOT):
         errors.extend(_workflow_credential_policy(path.name, value))
         if path.name != 'ci.yml' and 'mediaflow-signpath-main' in str(value.get('concurrency', '')).casefold():
             errors.append(path.name + ': the signing concurrency group is reserved for the opt-in CI run')
+        concurrency = value.get('concurrency')
+        group = concurrency.get('group') if isinstance(concurrency, dict) else concurrency
+        if path.name not in ('ci.yml', 'security.yml') and isinstance(group, str) and '${{' in group:
+            errors.append(path.name + ': unreviewed dynamic concurrency group cannot prove signing isolation')
         if value.get('permissions') != {'contents': 'read'}:
             errors.append(path.name + ': workflow permissions must be contents:read only')
         if 'pull_request_target' in value.get('on', {}):
@@ -479,6 +483,10 @@ def workflow_policy(root=ROOT):
         for key, job in value.get('jobs', {}).items():
             if path.name != 'ci.yml' and 'mediaflow-signpath-main' in str(job.get('concurrency', '')).casefold():
                 errors.append(path.name + '/' + key + ': the signing concurrency group cannot be reused by another job')
+            concurrency = job.get('concurrency')
+            group = concurrency.get('group') if isinstance(concurrency, dict) else concurrency
+            if path.name != 'ci.yml' and isinstance(group, str) and '${{' in group:
+                errors.append(path.name + '/' + key + ': unreviewed dynamic concurrency group cannot prove signing isolation')
             if job.get('uses'):
                 errors.append(path.name + '/' + key + ': reusable workflow is not in the reviewed Action policy')
             permissions = job.get('permissions', {})

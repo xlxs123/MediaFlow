@@ -468,6 +468,23 @@ class WorkflowPolicyTests(unittest.TestCase):
         path.write_text(original[:start] + original[end:], 'utf-8')
         self.assertFalse(gate.workflow_policy(self.root)['passed'])
 
+    def test_other_workflows_cannot_compute_the_reserved_signing_group(self):
+        import yaml
+        computed = "${{ format('mediaflow-{0}-main', 'signpath') }}"
+        self.assertEqual(expression_value(computed, {}), 'mediaflow-signpath-main')
+        path = self.root / '.github/workflows/extra.yml'
+        for level, group in product(('workflow', 'job'), (computed, 'mediaflow-extra-literal')):
+            with self.subTest(level=level, group=group):
+                value = {'on': 'workflow_dispatch', 'permissions': {'contents': 'read'},
+                    'jobs': {'unit': {'runs-on': 'ubuntu-24.04', 'steps': [{'run': 'echo unit'}]}}}
+                owner = value if level == 'workflow' else value['jobs']['unit']
+                owner['concurrency'] = {'group': group, 'cancel-in-progress': True}
+                path.write_text(yaml.safe_dump(value, sort_keys=False), 'utf-8')
+                result = gate.workflow_policy(self.root)
+                self.assertEqual(result['passed'], group != computed, result)
+                if group == computed:
+                    self.assertTrue(any('concurrency' in error for error in result['errors']))
+
     def test_security_workflow_cannot_cancel_signing_or_reuse_its_group_in_any_case(self):
         import yaml
         path = self.root / '.github/workflows/security.yml'
