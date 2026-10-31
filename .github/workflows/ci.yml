@@ -245,6 +245,18 @@ jobs:
           & .\.security-venv\Scripts\python.exe -B scripts/validate_sbom.py --directory verification/ci/sbom --require-native
           if ($LASTEXITCODE -ne 0) { throw 'Official CycloneDX schema or inventory binding failed.' }
 
+      - name: Retain small packaging and regression evidence for independent acceptance
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # same reviewed official v7.0.2
+        with:
+          name: MediaFlow-packaging-checks-${{ github.run_id }}
+          path: |
+            verification/ci/update/results.json
+            verification/ci/packaging-compatibility.json
+            verification/ci/test-signed-packaging.json
+            verification/ci/authenticode-tests.json
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Retain verified SBOM and generation evidence
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2; official tag verified
         with:
