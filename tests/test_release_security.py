@@ -12,7 +12,7 @@ from unittest.mock import patch
 from scripts import release_security as security
 
 
-def unsigned_pe(plus=True):
+def unsigned_pe(plus=True, *, with_archive=False):
     data = bytearray(512)
     data[:2] = b'MZ'
     struct.pack_into('<I', data, 0x3c, 128)
@@ -20,6 +20,9 @@ def unsigned_pe(plus=True):
     struct.pack_into('<H', data, 148, 240 if plus else 224)
     struct.pack_into('<H', data, 152, 0x20b if plus else 0x10b)
     struct.pack_into('<I', data, 152 + (108 if plus else 92), 16)
+    if with_archive:
+        from tests.pyinstaller_archive_fixture import archive_data
+        return archive_data(prefix=bytes(data))
     return bytes(data)
 
 
@@ -100,7 +103,7 @@ class ReleaseSecurityTests(unittest.TestCase):
             root = Path(temporary); source, target = root / 'source', root / 'target'
             records = []
             for name in (*security.FIRST_PARTY, 'LICENSE'):
-                before = unsigned_pe() if name in security.FIRST_PARTY else b'unit license'
+                before = unsigned_pe(with_archive=name == 'MediaFlow.exe') if name in security.FIRST_PARTY else b'unit license'
                 after = synthetic_certificate_append(before) if name in security.FIRST_PARTY else before
                 for tree, data in ((source, before), (target, after)):
                     path = tree / name; path.parent.mkdir(parents=True, exist_ok=True); path.write_bytes(data)

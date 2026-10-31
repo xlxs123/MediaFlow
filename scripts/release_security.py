@@ -191,6 +191,20 @@ def signature_only_change(before, after):
         scope='Byte preservation only; native production certificate, trust and timestamp checks are separate.')
 
 
+def first_party_change(name, before, after):
+    """Keep ordinary PE signing and main-program archive selection separate."""
+    if name not in FIRST_PARTY:
+        raise ReleaseSecurityError('Unexpected first-party signing path.')
+    change = signature_only_change(before, after)
+    if name == 'MediaFlow.exe':
+        from scripts.pyinstaller_payload import PayloadError, archive_unchanged
+        try:
+            change['pyinstaller_payload'] = archive_unchanged(before, after)
+        except PayloadError as error:
+            raise ReleaseSecurityError(str(error)) from None
+    return change
+
+
 def signing_derivation(unsigned_release, signed_release, unsigned_receipt, auth_report, output):
     from scripts.package_update import _plain, _inventory
     source, target = _plain(unsigned_release).resolve(), _plain(signed_release).resolve()
@@ -206,7 +220,7 @@ def signing_derivation(unsigned_release, signed_release, unsigned_receipt, auth_
         if before.stat().st_size != record['size'] or digest(before) != record['sha256']:
             raise ReleaseSecurityError('Original CI input changed during signing.')
         if name in FIRST_PARTY:
-            change = signature_only_change(before.read_bytes(), after.read_bytes())
+            change = first_party_change(name, before.read_bytes(), after.read_bytes())
             changes.append(dict(path=name, **change))
         elif after.stat().st_size != record['size'] or digest(after) != record['sha256']:
             raise ReleaseSecurityError('Signing changed a third-party component, license or other CI-verified input.')

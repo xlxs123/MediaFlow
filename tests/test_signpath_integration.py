@@ -218,7 +218,7 @@ class SignPathArchiveTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
         self.unsigned = self.root / 'unsigned'
-        self.original = unsigned_pe()
+        self.original = unsigned_pe(with_archive=True)
         self.signed = synthetic_certificate_append(self.original)
         for name in bridge.FIRST_PARTY:
             path = self.unsigned / name

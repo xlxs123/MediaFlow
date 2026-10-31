@@ -22,7 +22,7 @@ if __package__ in ('', None):
     sys.path.insert(0, str(ROOT))
 
 from scripts.release_security import (FIRST_PARTY, read_document, save_new,
-    signature_only_change, authenticode, signing_derivation)
+    first_party_change, authenticode, signing_derivation)
 
 ACTION_COMMIT = 'f6d04783b4569d051e0c80105fe66e82819d0092'
 REPOSITORY = 'xlxs123/MediaFlow'
@@ -122,7 +122,7 @@ def inspect_archive(path, unsigned):
             if not 0 < entry.file_size <= 600 * 1024 * 1024 or total > 1024 * 1024 * 1024:
                 raise SignPathError('Returned PE exceeds the bounded artifact size.')
             data = archive.read(entry)
-            signature_only_change((Path(unsigned) / name).read_bytes(), data)
+            first_party_change(name, (Path(unsigned) / name).read_bytes(), data)
             result[name] = data
     if set(result) != set(FIRST_PARTY):
         raise SignPathError('Incomplete first-party signing result.')

@@ -165,6 +165,12 @@ jobs:
               --runtime-identity $privateIdentity --report verification/ci/release-structure.json
           if ($LASTEXITCODE -ne 0) { throw 'Complete portable-release structure check failed.' }
 
+      - name: Verify the actual onefile archive selection contract
+        run: |
+          & .\.venv\Scripts\python.exe -X utf8 -B scripts/check_packaging_compatibility.py `
+            --release-dir dist-mediaflow-ci --report verification/ci/packaging-compatibility.json
+          if ($LASTEXITCODE -ne 0) { throw 'Actual bootloader archive identity contract failed.' }
+
       - name: Inspect unsigned application and preserved third-party signatures
         run: |
           $ErrorActionPreference = 'Stop'
@@ -198,6 +204,15 @@ jobs:
             throw 'Test-certificate integration must remain separate from Windows trust and formal signing.'
           }
           Copy-Item -LiteralPath $resultPath -Destination verification/ci/authenticode-tests.json -ErrorAction Stop
+
+      - name: Verify archive identity of the normal SDK test-signed executable without running it
+        run: |
+          $signedWork = Join-Path (Join-Path $env:RUNNER_TEMP 'MediaFlow-authenticode-tests') ($env:GITHUB_RUN_ID + '-' + $env:GITHUB_RUN_ATTEMPT)
+          & .\.venv\Scripts\python.exe -X utf8 -B scripts/check_packaging_compatibility.py `
+            --release-dir (Join-Path $signedWork 'input') `
+            --signed-executable (Join-Path $signedWork 'signed-test-only/MediaFlow.exe') `
+            --report verification/ci/test-signed-packaging.json
+          if ($LASTEXITCODE -ne 0) { throw 'Normal test-signed EXE changed the runtime-selected archive.' }
 
       - name: Bind passed CI checks to the complete build
         run: |
@@ -249,6 +264,8 @@ jobs:
             verification/ci/build-attestation.json
             verification/ci/authenticode-inventory.json
             verification/ci/authenticode-tests.json
+            verification/ci/packaging-compatibility.json
+            verification/ci/test-signed-packaging.json
           if-no-files-found: error
           retention-days: 7
 
