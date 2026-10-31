@@ -271,7 +271,8 @@ def extract_ci_artifact(archive_path,output,artifact,repo,commit,run_id,version,
     if output.exists():raise PipelineError('CI 解包目录已存在，不能覆盖。')
     allowed={'verification/ci/release-structure.json','verification/ci/update/results.json',
              'verification/ci/build-attestation.json','verification/ci/authenticode-inventory.json',
-             'verification/ci/authenticode-tests.json'}
+             'verification/ci/authenticode-tests.json',
+             'verification/ci/packaging-compatibility.json','verification/ci/test-signed-packaging.json'}
     with frozen_file(archive_path) as stream:
         h=hashlib.sha256();size=0
         for block in iter(lambda:stream.read(1024*1024),b''):h.update(block);size+=len(block)

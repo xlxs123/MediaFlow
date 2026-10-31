@@ -29,7 +29,8 @@ GROUPS = {
              'test_dependency_audit', 'test_secret_scan', 'test_sbom', 'test_security_gate', 'test_security_tools',
              'test_codeql_reviews', 'test_fixture_security', 'test_public_metadata_contract',
              'test_authenticode', 'test_release_security', 'test_native_sbom', 'test_sbom_validation',
-             'test_package_paths', 'test_regression_progress'],
+             'test_package_paths', 'test_regression_progress', 'test_signpath_integration', 'test_native_version_info',
+             'test_pyinstaller_payload'],
     'ui': ['test_update_ui'],
     'output': ['test_output_integration'],
 }
