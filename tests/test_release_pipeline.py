@@ -335,5 +335,17 @@ class CIArchiveTests(unittest.TestCase):
         self.assertEqual(verify.call_args.kwargs['expected_commit'],COMMIT)
         self.assertEqual((self.root/'new/dist-mediaflow-ci/README.md').read_bytes(),b'unit')
 
+    def test_only_exact_new_packaging_reports_are_accepted_without_claiming_provenance(self):
+        reports = ('verification/ci/packaging-compatibility.json',
+                   'verification/ci/test-signed-packaging.json')
+        artifact = self.write([('dist-mediaflow-ci/README.md', b'unit'),
+            ('verification/ci/build-attestation.json', b'unit-only-mocked-receipt'),
+            *[(name, b'{"passed":true,"native_signature_verified":false}') for name in reports]])
+        with patch('scripts.ci_build_receipt.verify_receipt', return_value={'passed': True}):
+            value = self.invoke(artifact)
+        self.assertFalse(value['ci_provenance_verified'])
+        for name in reports:
+            self.assertTrue((self.root / 'new' / name).is_file())
+
 
 if __name__=='__main__':unittest.main()

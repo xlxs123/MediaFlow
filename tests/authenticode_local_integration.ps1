@@ -110,6 +110,13 @@ try{
     $null=Run-Case 'public-only-production-inspect' @('-Operation','Inspect','-Mode','Production','-CertificateThumbprint',$publicThumbprint) $false 'private_key_unavailable'
     $null=Run-Case 'production-unconfigured' @('-Operation','Sign','-Mode','Production','-ReleaseDirectory',$inputTree,'-OutputDirectory',(Join-Path $work 'production-unconfigured-output')) $false 'certificate_not_configured'
     $null=Run-Case 'production-reject-test' @('-Operation','Sign','-Mode','Production','-ReleaseDirectory',$inputTree,'-OutputDirectory',(Join-Path $work 'production-test-output'),'-CertificateThumbprint',$certificate.Thumbprint) $false 'untrusted_production_certificate'
+    # The signer was created only in CurrentUser/My. Looking in LocalMachine/My
+    # exercises the exact embedded-public-certificate route without importing or
+    # deleting any certificate and without making the test signer trusted.
+    if(Test-Path -LiteralPath ('Cert:\LocalMachine\My\'+$certificate.Thumbprint)){throw 'The isolated test signer unexpectedly exists in the other store.'}
+    $embedded=Run-Case 'embedded-exact-test-signer-still-untrusted' @('-Operation','Verify','-Mode','Production','-ReleaseDirectory',$signed,'-CertificateStore','LocalMachine','-CertificateThumbprint',$certificate.Thumbprint) $false 'untrusted_production_certificate'
+    if($embedded.certificate.source -ne 'embedded_exact_signer' -or $embedded.certificate.store -ne 'EmbeddedSigner' -or $embedded.certificate.has_private_key){throw 'The remote-style verifier did not use only the exact embedded public signer.'}
+    $null=Run-Case 'embedded-wrong-thumbprint-refused' @('-Operation','Verify','-Mode','Production','-ReleaseDirectory',$signed,'-CertificateStore','LocalMachine','-CertificateThumbprint',('F'*40)) $false 'certificate_not_found'
     # Exercise actual final archive bytes without using the production publisher,
     # a production key, a trusted test root or a fabricated formal report.
     $script:integrationStage='final-package-create'

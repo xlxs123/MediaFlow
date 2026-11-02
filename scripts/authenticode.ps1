@@ -119,10 +119,20 @@ function Select-Certificate {
     if(-not $CertificateThumbprint){if($Mode -ne 'CI'){Stop-Auth 'certificate_not_configured' 'Authenticode 未配置：需要明确指定正式代码签名证书。'};return $null}
     if($CertificateThumbprint -notmatch '^[a-fA-F0-9]{40}$'){Stop-Auth 'invalid_thumbprint' 'The certificate thumbprint must contain exactly 40 hexadecimal characters.'}
     $thumb=$CertificateThumbprint.ToUpperInvariant();$cert=Get-Item -LiteralPath ('Cert:\'+$CertificateStore+'\My\'+$thumb) -ErrorAction SilentlyContinue
+    # Remote signing services keep the private key remotely. Verify an exact,
+    # reviewed thumbprint from the embedded signer without importing a key or
+    # changing Windows trust. Sign/Inspect retain their existing store rules.
+    $embedded=$false
+    if(-not $cert -and $Operation -eq 'Verify' -and $Mode -eq 'Production' -and $ReleaseDirectory){
+        $candidate=(Get-AuthenticodeSignature -LiteralPath (Join-Path $root 'MediaFlow.exe')).SignerCertificate
+        if($candidate -and $candidate.Thumbprint -eq $thumb){$cert=$candidate;$embedded=$true}
+    }
     if(-not $cert){Stop-Auth 'certificate_not_found' 'The explicitly selected certificate was not found; no other certificate will be substituted.'}
     $script:result.configuration_state='invalid_certificate'
     $chain=Certificate-Chain $cert ($Mode -eq 'Production')
     $script:result.certificate=[ordered]@{thumbprint=$cert.Thumbprint;subject=$cert.Subject;issuer=$cert.Issuer;not_before=$cert.NotBefore.ToUniversalTime().ToString('o');not_after=$cert.NotAfter.ToUniversalTime().ToString('o');has_private_key=$cert.HasPrivateKey;code_signing_eku=(Certificate-Eku $cert '1.3.6.1.5.5.7.3.3');chain=$chain;self_signed=($cert.Subject -eq $cert.Issuer);store=$CertificateStore}
+    $script:result.certificate.source=if($embedded){'embedded_exact_signer'}else{'explicit_certificate_store'}
+    if($embedded){$script:result.certificate.store='EmbeddedSigner'}
     $now=Get-Date
     if($cert.NotBefore -gt $now -or $cert.NotAfter -le $now){Stop-Auth 'certificate_expired_or_not_yet_valid' 'The selected certificate is outside its validity period.'}
     if(-not $script:result.certificate.code_signing_eku){Stop-Auth 'wrong_eku' 'The certificate does not explicitly allow code signing.'}

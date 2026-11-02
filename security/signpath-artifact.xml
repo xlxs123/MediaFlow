@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Proposed configuration only. Apply/review with Foundation after approval.
+     This matches the GitHub-uploaded three-PE ZIP, never all upstream DLLs. -->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters>
+    <parameter name="version" required="true" />
+  </parameters>
+  <zip-file>
+    <pe-file path="MediaFlow.exe" product-name="MediaFlow" product-version="${version}">
+      <authenticode-sign />
+    </pe-file>
+    <pe-file path="tools/MediaFlow.Recycle.exe" product-name="MediaFlow" product-version="${version}">
+      <authenticode-sign />
+    </pe-file>
+    <pe-file path="tools/webview2/MediaFlow.WebView2Host.exe" product-name="MediaFlow" product-version="${version}">
+      <authenticode-sign />
+    </pe-file>
+  </zip-file>
+</artifact-configuration>

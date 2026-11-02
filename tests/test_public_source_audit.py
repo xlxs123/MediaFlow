@@ -40,6 +40,14 @@ class PublicSourceAuditTests(unittest.TestCase):
         self.assertEqual(first['manifest_sha256'], second['manifest_sha256'])
         self.assertEqual(first['files'][0]['sha256'], hashlib.sha256(b'MIT unit fixture\n').hexdigest())
 
+    def test_only_two_reviewed_public_signpath_configuration_paths_are_allowed(self):
+        for name in ('security/signpath-policy.json', 'security/signpath-artifact.xml'):
+            self.file(name, '{}')
+            self.assertTrue(audit(self.root, candidates=[name])['passed'])
+        for name in ('security/signpath-token.json', 'security/other-artifact.xml', 'security/signpath.key'):
+            self.file(name, '{}')
+            self.assertFalse(audit(self.root, candidates=[name])['passed'])
+
     def test_test_secrets_are_not_implicitly_exempt_and_require_exact_review(self):
         name = 'tests/test_synthetic.py'
         self.file(name, "password = 'synthetic-unit-passphrase'\n")

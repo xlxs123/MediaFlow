@@ -51,6 +51,9 @@ if ($LASTEXITCODE -ne 0) { throw '回收站辅助程序构建失败。' }
 if ($LASTEXITCODE -ne 0) { throw 'WebView2 原生宿主构建失败。' }
 Invoke-Checked $venvPython @('scripts\stamp_build.py')
 Invoke-Checked $venvPython @('-m', 'PyInstaller', '--noconfirm', '--distpath', $distributionRoot, 'MediaFlow.spec')
+$packagingReport = Join-Path $PSScriptRoot ('verification\packaging-' + [Guid]::NewGuid().ToString('N') + '.json')
+New-Item -ItemType Directory -Path (Split-Path -Parent $packagingReport) -Force | Out-Null
+Invoke-Checked $venvPython @('scripts\check_packaging_compatibility.py', '--release-dir', $distributionRoot, '--report', $packagingReport)
 $toolTarget = Join-Path $distributionRoot 'tools'
 New-Item -ItemType Directory -Path $toolTarget -Force | Out-Null
 foreach ($toolName in @('yt-dlp.exe', 'ffmpeg.exe', 'ffprobe.exe', 'FFmpeg-LICENSE', 'FFmpeg-README.txt',
