@@ -138,6 +138,39 @@ jobs:
             throw 'Focused regression failed or skipped an unexpected capability.'
           }
 
+      - name: Storage UI original-order regression
+        timeout-minutes: 15
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & $env:MEDIAFLOW_TEST_PYTHON -X utf8 -B tests\run_unit_tests.py --group test_storage_ui --report-dir verification/ci/storage-ui
+          if ($LASTEXITCODE -ne 0) { throw 'Storage UI original-order regression failed.' }
+          $result = Get-Content -LiteralPath verification/ci/storage-ui/unit-test_storage_ui-results.json -Raw | ConvertFrom-Json
+          if (-not $result.passed -or -not $result.source_unchanged -or $result.tests -le 0 -or
+              $result.failures -ne 0 -or $result.errors -ne 0 -or $result.skipped -ne 0) {
+            throw 'Storage UI original-order regression did not complete without failures or skips.'
+          }
+
+      - name: Storage UI lifecycle failure-path regression
+        timeout-minutes: 15
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & $env:MEDIAFLOW_TEST_PYTHON -X utf8 -B tests\run_unit_tests.py --group test_storage_ui_lifecycle --report-dir verification/ci/storage-ui
+          if ($LASTEXITCODE -ne 0) { throw 'Storage UI lifecycle regression failed.' }
+          $result = Get-Content -LiteralPath verification/ci/storage-ui/unit-test_storage_ui_lifecycle-results.json -Raw | ConvertFrom-Json
+          if (-not $result.passed -or -not $result.source_unchanged -or $result.tests -le 0 -or
+              $result.failures -ne 0 -or $result.errors -ne 0 -or $result.skipped -ne 0) {
+            throw 'Storage UI lifecycle regression did not complete without failures or skips.'
+          }
+
+      - name: Retain storage UI lifecycle regression evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2; existing verified official pin
+        with:
+          name: MediaFlow-storage-ui-${{ github.run_id }}
+          path: verification/ci/storage-ui/
+          if-no-files-found: warn
+          retention-days: 30
+
       - name: Build an independent Windows folder
         run: |
           $ErrorActionPreference = 'Stop'
