@@ -1,0 +1,5 @@
+.github/workflows/ci.yml
+tests/test_storage_ui.py
+tests/test_storage_ui_lifecycle.py
+STORAGE_UI_NATIVE_CRASH_REPORT.md
+STORAGE_UI_NATIVE_CRASH_MODIFIED_FILES.txt
