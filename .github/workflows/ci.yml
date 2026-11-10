@@ -11,6 +11,11 @@ on:
         required: false
         type: boolean
         default: false
+      full_regression:
+        description: 'Run the complete isolated unittest entry and retain timing evidence'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -286,6 +291,27 @@ jobs:
             verification/ci/test-signed-packaging.json
           if-no-files-found: error
           retention-days: 7
+
+      - name: Run the full timing-enabled regression entry
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.full_regression && !inputs.signpath_request }}
+        timeout-minutes: 45
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & $env:MEDIAFLOW_TEST_PYTHON -X utf8 -B tests\run_unit_tests.py --report-dir verification/ci/full
+          if ($LASTEXITCODE -ne 0) { throw 'The complete regression entry failed. Inspect the retained timing evidence.' }
+          $result = Get-Content -LiteralPath verification/ci/full/unit-results.json -Raw | ConvertFrom-Json
+          if (-not $result.passed -or -not $result.source_unchanged) { throw 'Complete regression evidence did not pass.' }
+
+      - name: Retain full regression timing evidence
+        if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.full_regression && !inputs.signpath_request }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2; existing verified official pin
+        with:
+          name: MediaFlow-full-timing-${{ github.run_id }}
+          path: |
+            verification/ci/full/unit-results.json
+            verification/ci/full/unit-*-progress.jsonl
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Retain failed-test summary
         if: failure()
