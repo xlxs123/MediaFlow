@@ -16,6 +16,11 @@ on:
         required: false
         type: boolean
         default: false
+      storage_mutation_probe:
+        description: 'Collect targeted Windows file mutation evidence'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -29,6 +34,7 @@ concurrency:
 jobs:
   windows:
     name: Python 3.14 / Windows x64
+    if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/diag/storage-file-mutation-20261110' && inputs.storage_mutation_probe && !inputs.signpath_request) }}
     outputs:
       build_version: ${{ steps.source-identity.outputs.version }}
     runs-on: windows-2022
@@ -326,6 +332,35 @@ jobs:
           path: verification/ci/update/results.json
           if-no-files-found: ignore
           retention-days: 7
+
+  storage-mutation-evidence:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/diag/storage-file-mutation-20261110' && inputs.storage_mutation_probe && !inputs.signpath_request }}
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1; existing verified official pin
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0; existing verified official pin
+        with:
+          python-version: '3.14'
+          architecture: x64
+      - name: Capture original assertions and file identity events
+        shell: pwsh
+        run: |
+          git fetch --no-tags --depth=1 origin 47e2d62f005c323d1e3c1b070ffdff1bae29bdc8
+          if ($LASTEXITCODE -ne 0) { throw 'Could not fetch the immutable comparison source.' }
+          python -X utf8 -B tests\diagnose_storage_mutation.py --alternate-temp $env:RUNNER_TEMP --output verification/ci/storage-mutation/trace.json
+          if ($LASTEXITCODE -ne 0) { throw 'Storage mutation diagnostic could not complete.' }
+      - name: Retain targeted storage mutation evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2; existing verified official pin
+        with:
+          name: MediaFlow-storage-mutation-${{ github.run_id }}
+          path: verification/ci/storage-mutation/trace.json
+          if-no-files-found: ignore
+          retention-days: 30
 
   provenance:
     name: Official build provenance
