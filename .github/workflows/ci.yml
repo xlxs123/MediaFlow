@@ -297,6 +297,11 @@ jobs:
         timeout-minutes: 45
         run: |
           $ErrorActionPreference = 'Stop'
+          # Keep fixture paths canonical when the runner's default Temp uses an 8.3 alias.
+          $fixtureTemp = New-Item -ItemType Directory -Path (Join-Path $env:RUNNER_TEMP 'mediaflow-full-fixtures')
+          $env:TEMP = (& $env:MEDIAFLOW_TEST_PYTHON -X utf8 -B -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve(strict=True))' $fixtureTemp.FullName).Trim()
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $env:TEMP -PathType Container)) { throw 'Canonical fixture directory could not be initialized.' }
+          $env:TMP = $env:TEMP
           & $env:MEDIAFLOW_TEST_PYTHON -X utf8 -B tests\run_unit_tests.py --report-dir verification/ci/full
           if ($LASTEXITCODE -ne 0) { throw 'The complete regression entry failed. Inspect the retained timing evidence.' }
           $result = Get-Content -LiteralPath verification/ci/full/unit-results.json -Raw | ConvertFrom-Json
