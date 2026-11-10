@@ -17,7 +17,8 @@ class CoreTestTelemetryTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix='MediaFlow-core-telemetry-')
         self.addCleanup(self.temporary.cleanup)
-        self.root = Path(self.temporary.name)
+        # Runner Temp may spell the same directory with an 8.3 account alias.
+        self.root = Path(self.temporary.name).resolve()
 
     def test_command_label_only_exposes_known_program_and_operation(self):
         private = 'synthetic_argument_diagnostic_canary'
