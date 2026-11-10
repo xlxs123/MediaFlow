@@ -104,7 +104,7 @@ jobs:
 
       - name: Prepare verified portable tools
         run: |
-          & .\.venv\Scripts\python.exe -X utf8 -B tools\prepare_tools.py
+          & .\.venv\Scripts\python.exe -X utf8 -B scripts\prepare_ci_tools.py
           if ($LASTEXITCODE -ne 0) { throw 'Portable tools failed download or publisher checksum verification.' }
 
       - name: Prepare isolated regression dependencies
@@ -123,7 +123,7 @@ jobs:
       - name: Storage scan and cache transaction regression
         run: |
           $ErrorActionPreference = 'Stop'
-          & $env:MEDIAFLOW_TEST_PYTHON -X utf8 -B -m unittest -v tests.test_storage_cache tests.test_storage_scan tests.test_storage_scan_batches tests.test_storage_scan_path_safety tests.test_storage_cleanup tests.test_core_test_telemetry
+          & $env:MEDIAFLOW_TEST_PYTHON -X utf8 -B -m unittest -v tests.test_storage_cache tests.test_storage_scan tests.test_storage_scan_batches tests.test_storage_scan_path_safety tests.test_storage_cleanup tests.test_core_test_telemetry tests.test_prepare_ci_tools
           if ($LASTEXITCODE -ne 0) { throw 'Storage scan, cache transaction, or regression timing checks failed.' }
 
       - name: Update, signature, deployment and rollback regression
