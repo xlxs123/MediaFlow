@@ -70,6 +70,12 @@ class ProgressLog:
         self.thread = threading.Thread(target=self._heartbeat, args=(interval,), daemon=True)
         self.thread.start()
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        self.close()
+
     def event(self, phase, **values):
         row = dict(phase=phase, utc=datetime.now(timezone.utc).isoformat(),
                    elapsed_seconds=round(time.monotonic()-self.started, 4), **values)
@@ -101,58 +107,59 @@ class ProgressLog:
             self.stream.close()
 
 
-def result_type(progress):
+def unittest_counts(result):
+    return {name: len(getattr(result, name)) for name in (
+        'failures', 'errors', 'skipped', 'expectedFailures', 'unexpectedSuccesses')}
+
+
+def count_delta(before, result):
+    return {name: count - before[name] for name, count in unittest_counts(result).items()}
+
+
+def result_type(progress, *, telemetry=None):
     class Result(unittest.TextTestResult):
         def startTest(self, test):
-            self.case_start = time.monotonic(); self.case_outcome = 'passed'
+            self.case_start = time.perf_counter()
+            self.previous_counts = unittest_counts(self)
             progress.current = test.id(); progress.event('test_start', test=test.id())
+            if telemetry is not None:
+                telemetry.start_case(test.id(), test)
             super().startTest(test)
 
-        def addError(self, test, err):
-            self.case_outcome = 'error'; super().addError(test, err)
-
-        def addFailure(self, test, err):
-            if self.case_outcome != 'error': self.case_outcome = 'failure'
-            super().addFailure(test, err)
-
-        def addSkip(self, test, reason):
-            if self.case_outcome == 'passed': self.case_outcome = 'skipped'
-            super().addSkip(test, reason)
-
-        def addSubTest(self, test, subtest, err):
-            if err is not None and self.case_outcome != 'error':
-                self.case_outcome = 'failure'
-            super().addSubTest(test, subtest, err)
-
-        def addUnexpectedSuccess(self, test):
-            if self.case_outcome not in ('error', 'failure'): self.case_outcome = 'unexpected_success'
-            super().addUnexpectedSuccess(test)
-
-        def addExpectedFailure(self, test, err):
-            if self.case_outcome == 'passed': self.case_outcome = 'expected_failure'
-            super().addExpectedFailure(test, err)
-
         def stopTest(self, test):
-            progress.event('test_end', test=test.id(), outcome=self.case_outcome,
-                case_seconds=round(time.monotonic()-self.case_start, 4),
-                result_code=0 if self.case_outcome == 'passed' else None if self.case_outcome in ('skipped', 'expected_failure') else 1)
-            progress.current = None; super().stopTest(test)
+            super().stopTest(test)
+            counts = count_delta(self.previous_counts, self)
+            outcomes = (('errors', 'error', 1), ('failures', 'failure', 1),
+                ('unexpectedSuccesses', 'unexpected_success', 1), ('skipped', 'skipped', None),
+                ('expectedFailures', 'expected_failure', None))
+            outcome, code = next(((label, code) for name, label, code in outcomes if counts[name]), ('passed', 0))
+            metrics = telemetry.finish_case() if telemetry is not None else {}
+            progress.event('test_end', test=test.id(), outcome=outcome,
+                case_seconds=round(time.perf_counter()-self.case_start, 6), result_code=code,
+                unittest_count_delta=counts, **metrics)
+            progress.current = None
     return Result
 
 
-def progress_summary(path):
-    result = dict(tests_started=0, tests_finished=0, last_test=None)
+def progress_events(path):
     path = Path(path)
     if not path.is_file():
-        return result
+        return
     with path.open(encoding='utf-8') as stream:
         for line in stream:
             try:
                 row = json.loads(line)
             except ValueError:
                 continue  # A killed writer may leave only its final line partial.
-            if row.get('phase') == 'test_start':
-                result['tests_started'] += 1; result['last_test'] = row['test']
-            elif row.get('phase') == 'test_end':
-                result['tests_finished'] += 1
+            if isinstance(row, dict):
+                yield row
+
+
+def progress_summary(path):
+    result = dict(tests_started=0, tests_finished=0, last_test=None)
+    for row in progress_events(path):
+        if row.get('phase') == 'test_start':
+            result['tests_started'] += 1; result['last_test'] = row['test']
+        elif row.get('phase') == 'test_end':
+            result['tests_finished'] += 1
     return result

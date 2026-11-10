@@ -19,6 +19,7 @@ class StorageScanError(RuntimeError):
 
 _SKIP = frozenset(('.stream-downloads', 'browserprofile', '.ssh', '.gnupg', '.codex', '.aws', '.azure',
                     'credentials', '$recycle.bin', 'system volume information', 'user data'))
+_CACHE_BATCH_SIZE = 64
 _TYPES = {'video': frozenset(('mp4', 'mkv', 'webm', 'mov', 'avi', 'flv', 'm4v', 'mpg', 'mpeg', 'ts')),
           'audio': frozenset(('mp3', 'm4a', 'aac', 'flac', 'wav', 'ogg', 'opus', 'wma')),
           'subtitle': frozenset(('srt', 'vtt', 'ass', 'ssa', 'ttml', 'sub', 'lrc'))}
@@ -35,8 +36,13 @@ def _safe(path):
         raise StorageScanError('已跳过下载工作目录、回收站、浏览器配置或敏感凭据目录。')
     for current in (*reversed(path.parents), path):
         info = current.lstat()
-        if (stat.S_ISLNK(info.st_mode) or getattr(info, 'st_file_attributes', 0) & 0x400
-                or getattr(current, 'is_junction', lambda: False)()):
+        attributes = getattr(info, 'st_file_attributes', None)
+        tag = getattr(info, 'st_reparse_tag', None)
+        # Windows lstat reports name-surrogate reparse points without following them.
+        # Keep the separate junction query when this snapshot has no Windows metadata.
+        if (stat.S_ISLNK(info.st_mode) or (attributes or 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
+                or tag or ((attributes is None or tag is None)
+                           and getattr(current, 'is_junction', lambda: False)())):
             raise StorageScanError('已跳过符号链接、junction 或重解析路径，避免重复计数和误操作。')
     return path
 
@@ -77,9 +83,21 @@ class StorageScanner:
                   'groups': [], 'stats': {}, 'issues': [], 'scopes': ['媒体库已登记的媒体与独立字幕'],
                   'hash_bytes': 0, 'hash_total': 0, 'hashed_files': 0, 'cache_hits': 0}
         records, visited, physical = {}, set(), {}
+        pending_cache = []
 
         def issue(path, reason):
             result['issues'].append({'path': str(path), 'reason': reason})
+
+        def flush_cache():
+            if not pending_cache or cancel.is_set():
+                return
+            try:
+                self.cache.put_many(pending_cache)
+            except StorageCacheError as error:
+                issue(self.cache_path, str(error))
+                self.close()
+            finally:
+                pending_cache.clear()
 
         if self.cache_path:
             try:
@@ -164,9 +182,10 @@ class StorageScanner:
                     _safe(path)
                     if not path.is_dir():
                         raise StorageScanError('扫描目录不存在、离线或不可访问。')
-                    if any(path_key(path) == path_key(p) or path_key(path).startswith(path_key(p) + os.sep) for p in roots):
+                    root_key = path_key(path)
+                    if any(root_key == key or root_key.startswith(key + os.sep) for key in roots):
                         continue
-                    roots.append(path)
+                    roots.append(root_key)
                     stack = [path]
                     while stack and not cancel.is_set():
                         folder = stack.pop()
@@ -227,7 +246,8 @@ class StorageScanner:
                     _safe(path)
                     if identity_for(path) != row['identity']:
                         raise StorageScanError('文件自统计后发生变化，本次不确认重复。')
-                    cached = self.cache.get(path_key(path), row['identity']) if self.cache else ''
+                    cache_key = path_key(path) if self.cache else ''
+                    cached = self.cache.get(cache_key, row['identity']) if self.cache else ''
                     if cached:
                         digest = cached
                         result['cache_hits'] += 1
@@ -256,11 +276,9 @@ class StorageScanner:
                         raise StorageScanError('计算哈希后文件发生变化，本次不确认重复。')
                     row['sha256'] = digest
                     if self.cache and not cached:
-                        try:
-                            self.cache.put(path_key(path), row['identity'], digest)
-                        except StorageCacheError as error:
-                            issue(self.cache_path, str(error))
-                            self.close()
+                        pending_cache.append((cache_key, row['identity'], digest))
+                        if len(pending_cache) == _CACHE_BATCH_SIZE:
+                            flush_cache()
                     hashed[digest].append(row)
                     notify({'phase': 'hash', 'files_done': index + 1, 'files_total': len(candidates),
                             'bytes_done': result['hash_bytes'], 'bytes_total': result['hash_total'], 'path': str(path),
@@ -270,6 +288,7 @@ class StorageScanner:
                     row['sha256'] = ''
                     issue(path, str(error) if isinstance(error, StorageScanError) else '文件无法读取或已移动，本次不确认重复。')
             if not cancel.is_set():
+                flush_cache()
                 for digest, rows in hashed.items():
                     valid = []
                     for row in rows:

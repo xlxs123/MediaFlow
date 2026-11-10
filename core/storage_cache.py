@@ -33,10 +33,17 @@ class HashCache:
         return ''
 
     def put(self, key, identity, digest):
+        self.put_many(((key, identity, digest),))
+
+    def put_many(self, records):
+        """批量持久化已确认的哈希，先准备参数再获取写锁。"""
+        parameters = [(key, json.dumps(list(identity)), digest) for key, identity, digest in records]
+        if not parameters:
+            return
         try:
-            self.connection.execute('INSERT OR REPLACE INTO hashes VALUES (?,?,?)',
-                                    (key, json.dumps(list(identity)), digest))
-            self.connection.commit()
+            with self.connection:
+                self.connection.execute('BEGIN IMMEDIATE')
+                self.connection.executemany('INSERT OR REPLACE INTO hashes VALUES (?,?,?)', parameters)
         except sqlite3.Error:
             raise StorageCacheError('哈希缓存保存失败；本次已计算的内容验证仍有效。') from None
 
