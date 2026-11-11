@@ -1,16 +1,18 @@
 """真实磁盘统计和串行完整哈希；不使用媒体标题或扩展名确认重复。"""
 from collections import defaultdict
+from contextlib import ExitStack
 from datetime import datetime
 import hashlib
 import os
 from pathlib import Path
 import stat
 import threading
+from time import perf_counter_ns
 import uuid
 
 from core.storage_cache import HashCache, StorageCacheError
 from core.storage_safety import path_key
-from core.storage_identity import identity_for
+from core.storage_identity import identity_for, identity_from_stream, open_read_locked
 
 
 class StorageScanError(RuntimeError):
@@ -20,6 +22,7 @@ class StorageScanError(RuntimeError):
 _SKIP = frozenset(('.stream-downloads', 'browserprofile', '.ssh', '.gnupg', '.codex', '.aws', '.azure',
                     'credentials', '$recycle.bin', 'system volume information', 'user data'))
 _CACHE_BATCH_SIZE = 64
+_HASH_BLOCK = 1024 * 1024
 _TYPES = {'video': frozenset(('mp4', 'mkv', 'webm', 'mov', 'avi', 'flv', 'm4v', 'mpg', 'mpeg', 'ts')),
           'audio': frozenset(('mp3', 'm4a', 'aac', 'flac', 'wav', 'ogg', 'opus', 'wma')),
           'subtitle': frozenset(('srt', 'vtt', 'ass', 'ssa', 'ttml', 'sub', 'lrc'))}
@@ -65,6 +68,44 @@ def _network(path):
     return False
 
 
+def _read_digest(path, expected, cancel, on_chunk, retain=None):
+    """Hash the current file through one checked handle. On Windows, exclude writers."""
+    _safe(path)
+    with ExitStack() as opened:
+        stream = opened.enter_context(open_read_locked(path))
+
+        def check_handle():
+            info = os.fstat(stream.fileno())
+            if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1
+                    or getattr(info, 'st_file_attributes', 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
+                    or identity_from_stream(stream, info) != expected):
+                raise StorageScanError('文件身份或链接状态发生变化，本次不确认重复。')
+
+        check_handle()
+        algorithm = hashlib.sha256()
+        remaining = expected[2]
+        while remaining:
+            if cancel.is_set():
+                return None
+            data = stream.read(min(remaining, _HASH_BLOCK))
+            if not data:
+                raise StorageScanError('文件在读取期间缩短，本次不确认重复。')
+            algorithm.update(data)
+            remaining -= len(data)
+            on_chunk(len(data))
+        if cancel.is_set():
+            return None
+        if stream.read(1):
+            raise StorageScanError('文件在读取期间增大，本次不确认重复。')
+        check_handle()
+        _safe(path)
+        if identity_for(path) != expected:
+            raise StorageScanError('读取后文件路径发生变化，本次不确认重复。')
+        if retain is not None:
+            retain.enter_context(opened.pop_all())
+        return algorithm.hexdigest()
+
+
 class StorageScanner:
     def __init__(self, cache_path=None):
         self.cache_path = cache_path
@@ -81,12 +122,20 @@ class StorageScanner:
         guard = guard or (lambda _path: '')
         result = {'scan_id': uuid.uuid4().hex, 'complete': False, 'cancelled': False, 'files': [],
                   'groups': [], 'stats': {}, 'issues': [], 'scopes': ['媒体库已登记的媒体与独立字幕'],
-                  'hash_bytes': 0, 'hash_total': 0, 'hashed_files': 0, 'cache_hits': 0}
+                  'hash_bytes': 0, 'hash_total': 0, 'hashed_files': 0, 'cache_hits': 0,
+                  'sha256_reads': 0, 'confirmed_files': 0, 'confirmation_ns': 0}
         records, visited, physical = {}, set(), {}
         pending_cache = []
 
         def issue(path, reason):
             result['issues'].append({'path': str(path), 'reason': reason})
+
+        def reject(row, error):
+            row['status'] = ('missing' if isinstance(error, FileNotFoundError) else
+                             'inaccessible' if isinstance(error, PermissionError) else 'changed')
+            row['sha256'] = ''
+            issue(row['path'], str(error) if isinstance(error, StorageScanError) else
+                  '文件无法稳定读取或已移动，本次不确认重复。')
 
         def flush_cache():
             if not pending_cache or cancel.is_set():
@@ -237,76 +286,111 @@ class StorageScanner:
                     buckets[row['size']].append(row)
             candidates = [row for rows in buckets.values() if len(rows) > 1 for row in rows]
             result['hash_total'] = sum(row['size'] for row in candidates)
-            hashed = defaultdict(list)
+            observed = defaultdict(list)
+            confirmed_bytes = 0
+
+            def report(phase, row, index, done, total, message):
+                notify({'phase': phase, 'files_done': index, 'files_total': len(candidates),
+                        'bytes_done': done, 'bytes_total': total, 'path': row['path'], 'message': message})
+
+            def read(row, index, phase, retain=None):
+                def advance(count):
+                    nonlocal confirmed_bytes
+                    if phase == 'read':
+                        result['hash_bytes'] += count
+                    else:
+                        confirmed_bytes += count
+                    report(phase, row, index, result['hash_bytes'] + confirmed_bytes,
+                           2 * result['hash_total'], '正在读取当前文件内容' if phase == 'read' else '正在复核当前文件内容')
+
+                digest = _read_digest(Path(row['path']), row['identity'], cancel, advance, retain)
+                if digest is not None:
+                    result['sha256_reads'] += 1
+                return digest
+
             for index, row in enumerate(candidates):
                 if cancel.is_set():
                     break
                 path = Path(row['path'])
                 try:
-                    _safe(path)
-                    if identity_for(path) != row['identity']:
-                        raise StorageScanError('文件自统计后发生变化，本次不确认重复。')
+                    checkpoint = result['hash_bytes'] + min(row['size'], _HASH_BLOCK)
+                    digest = read(row, index, 'read')
+                    if digest is None or cancel.is_set():
+                        break
+                    # Deliver the first hash checkpoint once the read handle has closed.
+                    # Later callbacks may touch the path. Confirmation reads it again.
+                    if row['size']:
+                        report('hash', row, index, checkpoint, result['hash_total'], '文件内容已读取，等待复核')
+                    if cancel.is_set():
+                        break
                     cache_key = path_key(path) if self.cache else ''
                     cached = self.cache.get(cache_key, row['identity']) if self.cache else ''
-                    if cached:
-                        digest = cached
+                    if cached == digest:
                         result['cache_hits'] += 1
-                        # bytes_done 是已经完成验证的候选字节，cache_hits 单独展示，并非磁盘读速率。
-                        result['hash_bytes'] += row['size']
                     else:
-                        algorithm = hashlib.sha256()
-                        with path.open('rb') as stream:
-                            if file_identity(os.fstat(stream.fileno()))[:4] != row['identity'][:4]:
-                                raise StorageScanError('文件已被替换，本次不确认重复。')
-                            while data := stream.read(1024 * 1024):
-                                if cancel.is_set():
-                                    break
-                                algorithm.update(data)
-                                result['hash_bytes'] += len(data)
-                                notify({'phase': 'hash', 'files_done': index, 'files_total': len(candidates),
-                                        'bytes_done': result['hash_bytes'], 'bytes_total': result['hash_total'],
-                                        'path': str(path), 'message': '正在串行计算完整 SHA-256'})
-                            if cancel.is_set():
-                                break
-                            if file_identity(os.fstat(stream.fileno()))[:4] != row['identity'][:4]:
-                                raise StorageScanError('计算哈希期间文件发生变化，本次不确认重复。')
-                        digest = algorithm.hexdigest()
                         result['hashed_files'] += 1
-                    if identity_for(path) != row['identity']:
-                        raise StorageScanError('计算哈希后文件发生变化，本次不确认重复。')
-                    row['sha256'] = digest
-                    if self.cache and not cached:
-                        pending_cache.append((cache_key, row['identity'], digest))
-                        if len(pending_cache) == _CACHE_BATCH_SIZE:
-                            flush_cache()
-                    hashed[digest].append(row)
-                    notify({'phase': 'hash', 'files_done': index + 1, 'files_total': len(candidates),
-                            'bytes_done': result['hash_bytes'], 'bytes_total': result['hash_total'], 'path': str(path),
-                            'message': '完整 SHA-256 内容已核对' + ('（命中有效缓存）' if cached else '')})
+                        if self.cache:
+                            pending_cache.append((cache_key, row['identity'], digest))
+                            if len(pending_cache) == _CACHE_BATCH_SIZE:
+                                flush_cache()
+                    observed[digest].append((row, cache_key))
+                    report('hash', row, index + 1, result['hash_bytes'], result['hash_total'],
+                           '文件内容已读取，等待复核')
                 except (OSError, StorageScanError) as error:
-                    row['status'] = 'changed' if not isinstance(error, PermissionError) else 'inaccessible'
-                    row['sha256'] = ''
-                    issue(path, str(error) if isinstance(error, StorageScanError) else '文件无法读取或已移动，本次不确认重复。')
+                    reject(row, error)
             if not cancel.is_set():
                 flush_cache()
-                for digest, rows in hashed.items():
-                    valid = []
-                    for row in rows:
-                        try:
-                            if identity_for(row['path']) == row['identity']:
-                                valid.append(row)
-                            else:
-                                row['status'] = 'changed'
-                                issue(row['path'], '扫描结束前文件发生变化，已从重复组排除。')
-                        except OSError:
-                            row['status'] = 'missing'
-                            issue(row['path'], '扫描结束前文件丢失，已从重复组排除。')
-                    if len(valid) > 1:
-                        size = valid[0]['size']
-                        result['groups'].append({'id': digest, 'sha256': digest, 'files': valid,
-                                                 'size': size, 'reclaimable_bytes': size * (len(valid) - 1)})
+                started = perf_counter_ns()
+                invalid = []
+                index = 0
+                for reference, rows in observed.items():
+                    if cancel.is_set():
+                        break
+                    with ExitStack() as retained:
+                        valid = []
+                        for row, cache_key in rows:
+                            if cancel.is_set():
+                                break
+                            try:
+                                digest = read(row, index, 'confirm', retained)
+                                if digest is None:
+                                    break
+                                if digest != reference:
+                                    raise StorageScanError('两次读取的文件内容不同，本次不确认重复。')
+                                valid.append((row, cache_key))
+                            except (OSError, StorageScanError) as error:
+                                reject(row, error)
+                                invalid.append((cache_key, row['identity'], reference))
+                            index += 1
+                        if cancel.is_set():
+                            break
+                        group = []
+                        for row, cache_key in valid:
+                            try:
+                                path = _safe(Path(row['path']))
+                                info = path.stat()
+                                if info.st_nlink != 1 or identity_for(path, info) != row['identity']:
+                                    raise StorageScanError('确认完成前文件路径发生变化，本次不确认重复。')
+                                row['sha256'] = reference
+                                result['confirmed_files'] += 1
+                                group.append(row)
+                            except (OSError, StorageScanError) as error:
+                                reject(row, error)
+                                invalid.append((cache_key, row['identity'], reference))
+                        if len(group) > 1:
+                            size = group[0]['size']
+                            result['groups'].append({'id': reference, 'sha256': reference, 'files': group,
+                                                     'size': size, 'reclaimable_bytes': size * (len(group) - 1)})
+                if self.cache and invalid:
+                    try:
+                        self.cache.discard_many(invalid)
+                    except StorageCacheError as error:
+                        issue(self.cache_path, str(error))
+                result['confirmation_ns'] = perf_counter_ns() - started
             result['cancelled'] = cancel.is_set()
             result['complete'] = not result['cancelled']
+            if result['cancelled']:
+                result['groups'].clear()
             stats = {'total_files': 0, 'total_bytes': 0, 'missing_files': 0, 'inaccessible_files': 0,
                      'duplicate_files': sum(len(g['files']) for g in result['groups']),
                      'reclaimable_bytes': sum(g['reclaimable_bytes'] for g in result['groups']),

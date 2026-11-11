@@ -1,4 +1,4 @@
-"""完整文件哈希缓存；只存本地路径、stat 身份和 SHA-256。"""
+"""先前完整读取的 SHA-256 记录；相同 stat 身份仍需内容核对。"""
 import json
 from pathlib import Path
 import re
@@ -46,6 +46,15 @@ class HashCache:
                 self.connection.executemany('INSERT OR REPLACE INTO hashes VALUES (?,?,?)', parameters)
         except sqlite3.Error:
             raise StorageCacheError('哈希缓存保存失败；本次已计算的内容验证仍有效。') from None
+
+    def discard_many(self, records):
+        # Do not remove a different digest that a concurrent scan has already saved.
+        parameters = [(key, json.dumps(list(identity)), digest) for key, identity, digest in records]
+        try:
+            with self.connection:
+                self.connection.executemany('DELETE FROM hashes WHERE path=? AND identity=? AND sha256=?', parameters)
+        except sqlite3.Error:
+            raise StorageCacheError('无法清除已失效的哈希缓存。') from None
 
     def close(self):
         if self.connection is not None:

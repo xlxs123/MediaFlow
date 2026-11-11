@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
-from core.media_storage_scan import StorageScanError, StorageScanner, _safe
+from core.media_storage_scan import StorageScanError, StorageScanner, _safe, open_read_locked
 
 
 def metadata_path(**fields):
@@ -147,20 +147,17 @@ class StoragePathScopeTests(unittest.TestCase):
         replacement = self.make_file('replacement.mp4')
         original = self.root / 'moved.mp4'
         victim_opens = 0
-        real_open = Path.open
-
-        def replace_before_open(path, *args, **kwargs):
+        def replace_before_open(path):
             nonlocal victim_opens
             if path == victim:
                 victim_opens += 1
-                if victim_opens == 2:
-                    victim.rename(original)
-                    replacement.rename(victim)
-            return real_open(path, *args, **kwargs)
+                victim.rename(original)
+                replacement.rename(victim)
+            return open_read_locked(path)
 
-        with patch.object(Path, 'open', replace_before_open):
+        with patch('core.media_storage_scan.open_read_locked', replace_before_open):
             result = StorageScanner().scan([{'path': str(victim)}, {'path': str(peer)}])
-        self.assertEqual(victim_opens, 2)
+        self.assertEqual(victim_opens, 1)
         self.assertTrue(result['complete'])
         self.assertEqual(result['files'][0]['status'], 'changed')
         self.assertEqual(result['hash_bytes'], len(self.contents))

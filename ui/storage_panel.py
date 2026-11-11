@@ -421,10 +421,12 @@ class StoragePanel(QWidget):
         phase = value.get('phase')
         done = int(value.get('bytes_done') or 0)
         total = int(value.get('bytes_total') or 0)
-        if phase == 'hash' and total:
+        if phase in ('read', 'confirm') and total:
             self.progress_bar.setRange(0, 1000)
             self.progress_bar.setValue(min(1000, int(done * 1000 / total)))
-            text = f'完整哈希：已核对 {_bytes(done)} / {_bytes(total)}（有效缓存另计）'
+            text = f'内容核验：已读取 {_bytes(done)} / {_bytes(total)}'
+        elif phase == 'hash':
+            return
         elif phase == 'done':
             self.progress_bar.setRange(0, 100)
             self.progress_bar.setValue(100 if not value.get('cancelled') else 0)
@@ -450,8 +452,8 @@ class StoragePanel(QWidget):
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(100 if complete else 0)
         self.progress_label.setText(
-            f'扫描完成 · 完整哈希 {self.result.get("hashed_files", 0)} 个文件 · '
-            f'有效缓存 {self.result.get("cache_hits", 0)} 个' if complete else
+            f'扫描完成 · 已确认内容 {self.result.get("confirmed_files", 0)} 个文件 · '
+            f'缓存比对一致 {self.result.get("cache_hits", 0)} 个' if complete else
             '扫描已取消或未完成，当前结果不能用于清理。')
         self.duplicate_summary.setText(
             f'完整 SHA-256 确认 {len(self._groups)} 组 / {stats.get("duplicate_files", 0)} 个重复文件；'
