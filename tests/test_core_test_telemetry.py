@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 from tests import run_unit_tests as entry
 from tests.core_test_telemetry import command_label
+from tools import package_release
 
 
 class CoreTestTelemetryTests(unittest.TestCase):
@@ -146,3 +147,42 @@ class CoreTestTelemetryTests(unittest.TestCase):
         self.assertIsInstance(child['launcher_pid'], int)
         self.assertIsInstance(child['exit_code'], int)
         self.assertNotEqual(child['exit_code'], 0)
+
+    def test_consecutive_default_runs_retain_evidence_and_select_latest_for_packaging(self):
+        verification = self.root / 'verification'
+        verification.mkdir()
+        legacy = verification / 'unit-results.json'
+        legacy.write_text('{"passed": false}', encoding='utf-8')
+        reports = []
+
+        def child(command, **options):
+            group, directory = command[4], Path(command[6])
+            if group == 'core':
+                reports.append(directory)
+            (directory / f'unit-{group}-results.json').write_text(json.dumps({
+                'group': group, 'passed': True, 'tests': 1, 'failures': 0,
+                'errors': 0, 'skipped': 0,
+            }), encoding='utf-8')
+            return {'timeout_seconds': options['timeout'], 'timed_out': False, 'exit_code': 0,
+                    'launcher_pid': 100, 'elapsed_seconds': 0.01}
+
+        with patch.object(sys, 'argv', ['tests/run_unit_tests.py']), \
+                patch.object(entry, 'ROOT', self.root), patch.object(package_release, 'ROOT', self.root), \
+                patch.object(entry, 'gui_modules', return_value=[]), \
+                patch.object(entry, 'run_child', side_effect=child), \
+                patch('utils.build_info.source_digest', return_value='fixture-digest'), \
+                redirect_stdout(io.StringIO()):
+            self.assertEqual(package_release.unit_evidence_directory(), verification)
+            self.assertEqual(entry.main(), 0)
+            first = reports[0] / 'unit-entry-progress.jsonl'
+            first_bytes = first.read_bytes()
+            self.assertEqual(entry.main(), 0)
+            self.assertEqual(len(set(reports)), 2)
+            self.assertEqual(first.read_bytes(), first_bytes)
+            self.assertEqual(package_release.unit_evidence_directory(), reports[1])
+            self.assertTrue(json.loads((reports[1] / 'unit-results.json').read_text('utf-8'))['passed'])
+            self.assertEqual(legacy.read_text('utf-8'), '{"passed": false}')
+            incomplete = reports[1].with_name(str(int(reports[1].name) + 1))
+            incomplete.mkdir()
+            self.assertEqual(package_release.unit_evidence_directory(), incomplete)
+            self.assertFalse((incomplete / 'unit-results.json').exists())

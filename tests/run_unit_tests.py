@@ -8,6 +8,7 @@ import os
 import re
 import subprocess
 import sys
+from tempfile import mkdtemp
 from time import perf_counter
 import unittest
 import faulthandler
@@ -27,7 +28,24 @@ OTHER_TIMEOUT_SECONDS = 900
 def report_directory():
     if '--report-dir' in sys.argv:
         return Path(sys.argv[sys.argv.index('--report-dir') + 1]).resolve()
-    return ROOT / 'verification'
+    runs = ROOT / 'verification' / 'unit-runs'
+    if '--group' in sys.argv:
+        runs.mkdir(parents=True, exist_ok=True)
+        return Path(mkdtemp(prefix='group-', dir=runs))
+    full = runs / 'full'
+    full.mkdir(parents=True, exist_ok=True)
+    # Sequence directories in launch order, so packaging cannot pick an older
+    # success while a newer run is incomplete. mkdir also reserves the number.
+    number = max((int(path.name) for path in full.iterdir()
+                  if path.name.isascii() and path.name.isdecimal()), default=0)
+    while True:
+        number += 1
+        directory = full / str(number)
+        try:
+            directory.mkdir()
+        except FileExistsError:
+            continue
+        return directory
 
 
 def cases(suite):

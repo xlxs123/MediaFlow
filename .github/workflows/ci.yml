@@ -128,8 +128,18 @@ jobs:
       - name: Storage scan and cache transaction regression
         run: |
           $ErrorActionPreference = 'Stop'
-          & $env:MEDIAFLOW_TEST_PYTHON -X utf8 -B -m unittest -v tests.test_storage_cache tests.test_storage_scan tests.test_storage_scan_batches tests.test_storage_scan_path_safety tests.test_storage_cleanup tests.test_core_test_telemetry tests.test_prepare_ci_tools
+          & $env:MEDIAFLOW_TEST_PYTHON -X utf8 -B -m unittest -v tests.test_storage_cache tests.test_storage_scan tests.test_storage_scan_batches tests.test_storage_scan_path_safety tests.test_storage_cleanup tests.test_storage_content_consistency tests.test_core_test_telemetry tests.test_prepare_ci_tools
           if ($LASTEXITCODE -ne 0) { throw 'Storage scan, cache transaction, or regression timing checks failed.' }
+
+      - name: Storage UI scan regression
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & $env:MEDIAFLOW_TEST_PYTHON -X utf8 -B tests\run_unit_tests.py --group test_storage_ui --report-dir verification/ci/storage-focused-ui
+          if ($LASTEXITCODE -ne 0) { throw 'Storage UI scan regression failed.' }
+          $result = Get-Content -LiteralPath verification/ci/storage-focused-ui/unit-test_storage_ui-results.json -Raw | ConvertFrom-Json
+          if (-not $result.passed -or -not $result.source_unchanged -or $result.tests -le 0 -or $result.skipped -ne 0) {
+            throw 'Storage UI scan regression did not complete without skips.'
+          }
 
       - name: Update, signature, deployment and rollback regression
         run: |
@@ -262,6 +272,7 @@ jobs:
           name: MediaFlow-packaging-checks-${{ github.run_id }}
           path: |
             verification/ci/update/results.json
+            verification/ci/storage-focused-ui/unit-test_storage_ui-results.json
             verification/ci/packaging-compatibility.json
             verification/ci/test-signed-packaging.json
             verification/ci/authenticode-tests.json
