@@ -7,7 +7,8 @@ import time
 import unittest
 from unittest.mock import patch
 
-from PySide6.QtCore import QTimer
+import shiboken6
+from PySide6.QtCore import QCoreApplication, QEvent, QTimer
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from core.media_history import HistoryStore
@@ -49,11 +50,14 @@ class StorageUITests(unittest.TestCase):
 
     def tearDown(self):
         self.service.shutdown()
-        self.wait(lambda: self.service.is_closed)
+        self.wait(lambda: self.service.is_closed and not self.service._worker._thread.is_alive())
         if self.panel.confirmation_dialog:
             self.panel.confirmation_dialog.close()
         self.panel.close()
         self.panel.deleteLater()
+        # A local processEvents loop does not itself deliver DeferredDelete.
+        QCoreApplication.sendPostedEvents(self.panel, QEvent.Type.DeferredDelete)
+        self.assertFalse(shiboken6.isValid(self.panel))
         self.app.processEvents()
         self.temp.cleanup()
 
@@ -113,12 +117,14 @@ class StorageUITests(unittest.TestCase):
                 store.record({'task_key': 'file-' + str(i), 'title': path.stem, 'task_state': 'completed',
                               'files': [{'path': str(path)}]})
         ticks = []
-        timer = QTimer()
+        timer = QTimer(self.panel)
         timer.setInterval(5)
         timer.timeout.connect(lambda: ticks.append(time.monotonic()))
         timer.start()
-        self.scan()
-        timer.stop()
+        try:
+            self.scan()
+        finally:
+            timer.stop()
         self.assertGreater(len(ticks), 2)
         self.assertEqual(self.service.result['stats']['total_files'], 303)
         self.assertLessEqual(self.panel.files_table.rowCount(), self.panel.FILE_PAGE_SIZE)
