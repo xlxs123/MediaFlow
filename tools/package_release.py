@@ -18,6 +18,17 @@ def digest(path):
     return hasher.hexdigest()
 
 
+def unit_evidence_directory():
+    verification = ROOT / 'verification'
+    full = verification / 'unit-runs' / 'full'
+    if full.is_dir():
+        latest = max((path for path in full.iterdir() if path.name.isascii() and path.name.isdecimal()),
+                     key=lambda path: int(path.name), default=None)
+        if latest is not None:
+            return latest
+    return verification  # Legacy report layout before numbered full runs.
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dist-dir', default='dist')
@@ -26,7 +37,8 @@ def main():
     args = parser.parse_args()
     distribution = ROOT / args.dist_dir
     tag = args.release_tag + '-' if args.release_tag else ''
-    unit = json.loads((ROOT / 'verification' / 'unit-results.json').read_text(encoding='utf-8'))
+    unit_evidence = unit_evidence_directory()
+    unit = json.loads((unit_evidence / 'unit-results.json').read_text(encoding='utf-8'))
     integration = json.loads((ROOT / 'verification' / 'integration-results.json').read_text(encoding='utf-8'))
     parallel = json.loads((ROOT / 'verification' / 'queue-integration-results.json').read_text(encoding='utf-8'))
     gui = json.loads((ROOT / 'verification' / 'packaged' / 'gui-results.json').read_text(encoding='utf-8'))
@@ -368,7 +380,7 @@ def main():
                  '启动开发版.vbs', 'THIRD_PARTY_NOTICES.md', 'LICENSE', '.gitignore'):
         source_files.append(ROOT / name)
     source_files.extend(path for path in (ROOT / 'tools').iterdir() if path.is_file() and path.suffix != '.exe' and path.suffix != '.zip')
-    for name in ('unit-results.txt', 'unit-results.json', 'integration-results.json', 'queue-integration-results.json',
+    for name in ('integration-results.json', 'queue-integration-results.json',
                  'protocol-audit.json', 'release-results.json', 'TEST_RESULTS.md', 'modified-files.json', 'MODIFIED_FILES.md', 'page-tools-results.json', 'rou-live-metadata.json',
                  'rou-pipeline-original-outputs.json', 'rou-original-container-scan.json', 'rou-original-recovery.json',
                  'rou-original-pipeline-replay.json', 'rou-pipeline-build-source.json'):
@@ -393,6 +405,8 @@ def main():
     with zipfile.ZipFile(ROOT / ('MediaFlow-' + tag + '完整源码.zip'), 'w', zipfile.ZIP_DEFLATED, compresslevel=6) as bundle:
         for path in sorted(source_files):
             bundle.write(path, Path('MediaFlow-source') / path.relative_to(ROOT))
+        for name in ('unit-results.txt', 'unit-results.json'):
+            bundle.write(unit_evidence / name, Path('MediaFlow-source/verification') / name)
     print(json.dumps(report, ensure_ascii=False, indent=2))
 
 

@@ -92,6 +92,8 @@ class _StorageWorker(QObject):
 
                     def report(progress):
                         phase = progress.get('phase', '')
+                        if phase == 'hash':
+                            return  # Synchronous file checkpoint. UI uses actual read progress.
                         now = time.monotonic()
                         if phase != previous[1] or phase == 'done' or now - previous[0] >= 0.06:
                             previous[:] = [now, phase]
