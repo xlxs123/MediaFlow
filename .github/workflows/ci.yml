@@ -435,7 +435,7 @@ jobs:
           retention-days: 7
       - name: Submit to the reviewed Foundation policy and wait for manual approval
         id: submit
-        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # official v3.0 verified
+        uses: signpath/github-action-submit-signing-request@a2c5b60d9c75f073142b653c354b632eedce097b # official v3.0 verified
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
           organization-id: ${{ steps.prepare.outputs.organization_id }}
